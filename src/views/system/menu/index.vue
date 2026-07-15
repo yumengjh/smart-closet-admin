@@ -355,6 +355,8 @@ onMounted(async () => {
               value="audit-log" /><el-option
               label="公告管理"
               value="announcement-management" /><el-option
+              label="简历管理"
+              value="resume-management" /><el-option
               label="账户安全"
               value="account-security" /></el-select
         ></el-form-item>

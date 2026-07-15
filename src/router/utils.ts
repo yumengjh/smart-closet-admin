@@ -44,6 +44,7 @@ export const routeComponentRegistry: Record<
   "audit-log": () => import("@/views/system/audit/index.vue"),
   "announcement-management": () =>
     import("@/views/content/announcements/index.vue"),
+  "resume-management": () => import("@/views/content/resume/index.vue"),
   "account-security": () => import("@/views/account/security/index.vue")
 };
 

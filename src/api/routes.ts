@@ -14,6 +14,7 @@ export type NavigationRoute = {
     | "ip-rule-management"
     | "audit-log"
     | "announcement-management"
+    | "resume-management"
     | "account-security"
     | null;
   title: string;

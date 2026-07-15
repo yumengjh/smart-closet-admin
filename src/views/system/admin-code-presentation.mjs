@@ -22,7 +22,8 @@ const definitions = {
     "system:audit:read": ["查看系统审计日志", "允许读取系统审计事件。"],
     "example:announcement:read": ["查看公告管理内容", "允许读取公告管理数据。"],
     "example:announcement:write": ["创建、编辑与发布公告", "允许维护和发布公告。"],
-    "example:announcement:delete": ["删除公告", "允许删除公告。"]
+    "example:announcement:delete": ["删除公告", "允许删除公告。"],
+    "resume:manage": ["管理公开简历", "允许查看和编辑公开简历的全部内容。"]
   },
   navigationComponent: {
     welcome: ["首页", "后台首页页面组件。"],
@@ -34,6 +35,7 @@ const definitions = {
     "ip-rule-management": ["IP 访问规则", "IP 访问规则管理页面组件。"],
     "audit-log": ["审计日志", "系统审计日志页面组件。"],
     "announcement-management": ["公告管理", "公告管理页面组件。"],
+    "resume-management": ["简历管理", "公开简历内容管理页面组件。"],
     "account-security": ["账户安全", "个人账户与会话安全页面组件。"]
   },
   ipRuleType: {
@@ -55,6 +57,7 @@ const definitions = {
     RuntimeSetting: ["运行时配置", "无需重启即可生效的系统配置。"],
     IpAccessRule: ["IP 访问规则", "持久化的 API IP 访问控制规则。"],
     Announcement: ["公告", "后台维护的公告内容。"],
+    ResumeDocument: ["简历", "公开简历的动态内容文档。"],
     NavigationMenu: ["后台菜单", "后台动态导航菜单项。"]
   },
   auditAction: {
@@ -83,6 +86,7 @@ const definitions = {
     ANNOUNCEMENT_PUBLISHED: ["发布公告", "将公告设为公开可见。"],
     ANNOUNCEMENT_UNPUBLISHED: ["撤回公告", "将公告从公开状态撤回。"],
     ANNOUNCEMENT_DELETED: ["删除公告", "删除了一篇公告。"],
+    RESUME_UPDATED: ["更新简历", "修改了公开简历内容。"],
     NAVIGATION_MENU_CREATED: ["创建后台菜单", "新增了一个后台导航菜单项。"],
     NAVIGATION_MENU_UPDATED: ["更新后台菜单", "修改了一个后台导航菜单项。"],
     NAVIGATION_MENU_DELETED: ["删除后台菜单", "删除了一个后台导航菜单项。"],

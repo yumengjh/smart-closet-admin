@@ -19,6 +19,7 @@ export type NavigationMenu = {
     | "ip-rule-management"
     | "audit-log"
     | "announcement-management"
+    | "resume-management"
     | "account-security"
     | null;
   icon: string | null;
