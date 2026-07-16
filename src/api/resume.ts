@@ -7,6 +7,12 @@ export type ResumeSection = { id: string; type: ResumeSectionType; title: string
 export type ResumeContent = { seo?: { title?: string; description?: string }; profile: { name: string; headline?: string; contacts: ResumeContact[] }; sections: ResumeSection[] };
 type ResumeWireDocument = { content: string; schemaVersion: number; version: number };
 export type ResumeDocument = Omit<ResumeWireDocument, "content"> & { content: ResumeContent };
+export type ResumeFeedbackType = "REACTION" | "REVIEW";
+export type ResumeReaction = "GREAT" | "GOOD" | "NEUTRAL" | "UNSURE" | "POOR";
+export type ResumeFeedbackStatus = "UNREAD" | "READ" | "ARCHIVED";
+export type ResumeFeedback = { id: string; type: ResumeFeedbackType; reaction?: ResumeReaction; rating?: number; suggestion?: string; ipAddress: string; userAgent?: string; status: ResumeFeedbackStatus; createdAt: string };
+export type ResumeFeedbackPage = { items: ResumeFeedback[]; page: number; size: number; totalElements: number; totalPages: number };
+export type ResumeFeedbackQuery = { page?: number; size?: number; type?: ResumeFeedbackType; status?: ResumeFeedbackStatus; rating?: number };
 
 const fail = (message: string): never => { throw new Error(message); };
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -23,3 +29,5 @@ const parseWireDocument = (document: ResumeWireDocument): ResumeDocument => ({ .
 export const toSavePayload = (document: ResumeDocument): ResumeWireDocument => ({ content: JSON.stringify(document.content), schemaVersion: document.schemaVersion, version: document.version });
 export const getManagedResume = async (): Promise<ResumeDocument> => parseWireDocument((await http.request<ApiResponse<ResumeWireDocument>>("get", "/resume/manage")).data);
 export const updateManagedResume = async (document: ResumeDocument): Promise<ResumeDocument> => parseWireDocument((await http.request<ApiResponse<ResumeWireDocument>>("put", "/resume/manage", { data: toSavePayload(document) })).data);
+export const getResumeFeedback = async (query: ResumeFeedbackQuery = {}): Promise<ResumeFeedbackPage> => (await http.request<ApiResponse<ResumeFeedbackPage>>("get", "/resume/feedback", { params: query })).data;
+export const updateResumeFeedbackStatus = async (id: string, status: ResumeFeedbackStatus): Promise<ResumeFeedback> => (await http.request<ApiResponse<ResumeFeedback>>("patch", `/resume/feedback/${id}/status`, { data: { status } })).data;
