@@ -16,6 +16,8 @@ export type NavigationRoute = {
     | "announcement-management"
     | "resume-management"
     | "account-security"
+    | "gc-management"
+    | "sql-console"
     | null;
   title: string;
   icon: string | null;

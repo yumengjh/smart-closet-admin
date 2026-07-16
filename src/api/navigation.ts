@@ -21,6 +21,8 @@ export type NavigationMenu = {
     | "announcement-management"
     | "resume-management"
     | "account-security"
+    | "gc-management"
+    | "sql-console"
     | null;
   icon: string | null;
   sortOrder: number;

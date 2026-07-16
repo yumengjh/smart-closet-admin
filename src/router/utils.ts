@@ -45,7 +45,9 @@ export const routeComponentRegistry: Record<
   "announcement-management": () =>
     import("@/views/content/announcements/index.vue"),
   "resume-management": () => import("@/views/content/resume/index.vue"),
-  "account-security": () => import("@/views/account/security/index.vue")
+  "account-security": () => import("@/views/account/security/index.vue"),
+  "gc-management": () => import("@/views/system/gc/index.vue"),
+  "sql-console": () => import("@/views/system/sql-console/index.vue")
 };
 
 function handRank(routeInfo: any) {

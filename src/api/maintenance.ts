@@ -1,0 +1,18 @@
+import { http } from "@/utils/http";
+import type { ApiResponse } from "./user";
+export type GcPolicy={resourceCode:string;displayName:string;description:string;enabled:boolean;automaticEnabled:boolean;retentionDays:number;batchSize:number};
+export type GcSchedule={automaticEnabled:boolean;intervalMinutes:number};
+export type GcRunResource={resourceCode:string;candidates:number;deleted:number;message:string};
+export type GcRunSummary={totalCandidates:number;totalDeleted:number;resources:GcRunResource[]};
+export type GcRun={id:string;status:string;triggerType:string;dryRun:boolean;requestedBy?:string;resourceCodes?:string;summary?:GcRunSummary;errorMessage?:string;traceId?:string;startedAt:string;completedAt?:string};
+export const getGcPolicies=()=>http.request<ApiResponse<GcPolicy[]>>("get","/system/gc/policies");
+export const updateGcPolicy=(code:string,data:Pick<GcPolicy,"enabled"|"automaticEnabled"|"retentionDays"|"batchSize">)=>{
+  const { enabled, automaticEnabled, retentionDays, batchSize } = data;
+  return http.request<ApiResponse<GcPolicy>>("put",`/system/gc/policies/${code}`,{data:{enabled,automaticEnabled,retentionDays,batchSize}});
+};
+export const getGcSchedule=()=>http.request<ApiResponse<GcSchedule>>("get","/system/gc/schedule");
+export const updateGcSchedule=(data:GcSchedule)=>http.request<ApiResponse<GcSchedule>>("put","/system/gc/schedule",{data});
+export const runGc=(dryRun:boolean,resourceCodes?:string[])=>http.request<ApiResponse<GcRun>>("post","/system/gc/runs",{data:{dryRun,resourceCodes}});
+export const getGcRuns=(params?:{page?:number;size?:number})=>http.request<ApiResponse<{items:GcRun[];totalElements:number}>>("get","/system/gc/runs",{params});
+export type SqlResult={query:boolean;updateCount:number;rows:Record<string,unknown>[]};
+export const executeSql=(sql:string,confirmDangerous:boolean)=>http.request<ApiResponse<SqlResult>>("post","/system/sql-console/execute",{data:{sql,confirmDangerous}});
