@@ -17,11 +17,14 @@ const rows = ref<Announcement[]>([]),
   loading = ref(false),
   dialog = ref(false),
   editing = ref<string>();
+const page = ref(0), size = ref(20), total = ref(0);
 const form = reactive({ title: "", content: "" });
 const load = async () => {
   loading.value = true;
   try {
-    rows.value = (await listAnnouncements()).data;
+    const { data } = await listAnnouncements({ page: page.value, size: size.value });
+    rows.value = data.items;
+    total.value = data.totalElements;
   } finally {
     loading.value = false;
   }
@@ -114,7 +117,8 @@ onMounted(load);
               >删除</el-button
             ></template
           ></el-table-column
-        ></el-table
+      ></el-table
+      ><div class="mt-4 flex justify-end"><el-pagination v-model:page-size="size" background layout="total, sizes, prev, pager, next" :current-page="page + 1" :total="total" @current-change="value => { page = value - 1; load(); }" @size-change="value => { size = value; page = 0; load(); }" /></div
       ></el-card
     >
     <el-dialog

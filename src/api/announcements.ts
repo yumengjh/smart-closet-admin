@@ -1,5 +1,6 @@
 import { http } from "@/utils/http";
 import type { ApiResponse } from "./user";
+export type PageResponse<T> = { items: T[]; page: number; size: number; totalElements: number; totalPages: number };
 
 export type Announcement = {
   id: string;
@@ -15,8 +16,8 @@ export const announcementPayload = (title: string, content: string) => {
     throw new Error("title and content are required");
   return { title: title.trim(), content: content.trim() };
 };
-export const listAnnouncements = () =>
-  http.request<ApiResponse<Announcement[]>>("get", "/announcements/manage");
+export const listAnnouncements = (params?: { page?: number; size?: number }) =>
+  http.request<ApiResponse<PageResponse<Announcement>>>("get", "/announcements/manage", { params });
 export const createAnnouncement = (title: string, content: string) =>
   http.request<ApiResponse<Announcement>>("post", "/announcements", {
     data: announcementPayload(title, content)
