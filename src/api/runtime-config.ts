@@ -11,6 +11,7 @@ export type RuntimeSetting = {
 export type RuntimeComponent = {
   code: string;
   displayName: string;
+  kind: "SERVICE_DEPENDENCY" | "LOCAL_RESOURCE";
   status: "UNKNOWN" | "CHECKING" | "UP" | "ERROR" | "DISABLED";
   lastCheckedAt?: string;
   lastSucceededAt?: string;
@@ -54,8 +55,8 @@ export const settingGroups = {
   runtime: [
     "runtime.config-refresh.enabled",
     "runtime.config-refresh.interval-seconds",
-    "runtime.dependency-health.enabled",
-    "runtime.dependency-health.interval-seconds",
+    "runtime.health-check.enabled",
+    "runtime.health-check.interval-seconds",
     "avatar.generator.enabled"
   ]
 } as const;
@@ -76,15 +77,15 @@ export const refreshRuntimeCache = (code: string) =>
     "post",
     "/system/runtime-caches/" + code + "/refresh"
   );
-export const listDependencies = () =>
-  http.request<ApiResponse<RuntimeComponent[]>>("get", "/system/dependencies");
-export const refreshDependencies = () =>
+export const listRuntimeChecks = () =>
+  http.request<ApiResponse<RuntimeComponent[]>>("get", "/system/runtime-checks");
+export const refreshRuntimeChecks = () =>
   http.request<ApiResponse<RuntimeComponent[]>>(
     "post",
-    "/system/dependencies/refresh"
+    "/system/runtime-checks/refresh"
   );
-export const refreshDependency = (code: string) =>
+export const refreshRuntimeCheck = (code: string) =>
   http.request<ApiResponse<RuntimeComponent>>(
     "post",
-    "/system/dependencies/" + code + "/refresh"
+    "/system/runtime-checks/" + code + "/refresh"
   );

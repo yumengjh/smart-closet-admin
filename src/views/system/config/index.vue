@@ -1,16 +1,12 @@
 <script setup lang="ts">
 import {
-  listDependencies,
   listRuntimeCaches,
   listRuntimeSettings,
-  refreshDependencies,
-  refreshDependency,
   refreshRuntimeCache,
   refreshRuntimeCaches,
   settingGroups,
   updateRuntimeSetting,
   type RuntimeCache,
-  type RuntimeComponent,
   type RuntimeSetting
 } from "@/api/runtime-config";
 import { useCurrentPermissions } from "@/composables/useCurrentPermissions";
@@ -24,17 +20,16 @@ import {
 } from "../runtime-setting-presentation.mjs";
 
 defineOptions({ name: "RuntimeConfig" });
+
 const { can } = useCurrentPermissions();
-const loading = ref(false),
-  settings = ref<RuntimeSetting[]>([]),
-  saving = ref<string>();
-const components = ref<RuntimeComponent[]>([]);
+const loading = ref(false);
+const settings = ref<RuntimeSetting[]>([]);
 const caches = ref<RuntimeCache[]>([]);
+const saving = ref<string>();
 const cachesRefreshing = ref(false);
-const dependenciesRefreshing = ref(false);
 const cacheRefreshing = ref<string>();
-const componentRefreshing = ref<string>();
 const stringDrafts = ref<Record<string, string>>({});
+
 const labels: Record<string, string> = {
   security: "安全审计",
   rateLimit: "全局限流",
@@ -44,6 +39,7 @@ const labels: Record<string, string> = {
   identity: "身份注册",
   runtime: "运行时管理"
 };
+
 const byKey = computed(
   () => new Map(settings.value.map(item => [item.key, item]))
 );
@@ -61,20 +57,18 @@ const runtimeGroup = computed(() =>
 const otherGroups = computed(() =>
   groups.value.filter(group => group.name !== "runtime")
 );
+
 const load = async () => {
   loading.value = true;
   try {
-    const [settingResponse, cacheResponse, dependencyResponse] = await Promise.all([
+    const [settingResponse, cacheResponse] = await Promise.all([
       listRuntimeSettings(),
-      listRuntimeCaches(),
-      listDependencies()
+      listRuntimeCaches()
     ]);
-    const data = settingResponse.data;
-    settings.value = data;
+    settings.value = settingResponse.data;
     caches.value = cacheResponse.data;
-    components.value = dependencyResponse.data;
     stringDrafts.value = Object.fromEntries(
-      data
+      settingResponse.data
         .filter(item => item.type === "STRING")
         .map(item => [item.key, item.value])
     );
@@ -82,6 +76,7 @@ const load = async () => {
     loading.value = false;
   }
 };
+
 const refreshAllCaches = async () => {
   cachesRefreshing.value = true;
   try {
@@ -94,6 +89,7 @@ const refreshAllCaches = async () => {
     cachesRefreshing.value = false;
   }
 };
+
 const refreshCache = async (code: string) => {
   cacheRefreshing.value = code;
   try {
@@ -109,35 +105,7 @@ const refreshCache = async (code: string) => {
     cacheRefreshing.value = undefined;
   }
 };
-const refreshAllDependencies = async () => {
-  dependenciesRefreshing.value = true;
-  try {
-    const response = await refreshDependencies();
-    components.value = response.data;
-    message("服务依赖状态已刷新", { type: "success" });
-  } finally {
-    dependenciesRefreshing.value = false;
-  }
-};
-const refreshComponent = async (code: string) => {
-  componentRefreshing.value = code;
-  try {
-    const response = await refreshDependency(code);
-    const index = components.value.findIndex(item => item.code === code);
-    if (index >= 0) components.value[index] = response.data;
-    message("服务依赖已重新探测", { type: "success" });
-  } finally {
-    componentRefreshing.value = undefined;
-  }
-};
-const componentTagType = (status: RuntimeComponent["status"]) =>
-  ({
-    UP: "success",
-    ERROR: "danger",
-    DISABLED: "info",
-    CHECKING: "warning",
-    UNKNOWN: "info"
-  })[status] as "success" | "danger" | "info" | "warning";
+
 const formatTime = (value?: string) =>
   value
     ? new Date(value).toLocaleString("zh-CN", { hour12: false })
@@ -154,6 +122,7 @@ const stringDraft = (item: RuntimeSetting) =>
 const updateStringDraft = (item: RuntimeSetting, value: string) => {
   stringDrafts.value[item.key] = value;
 };
+
 const save = async (item: RuntimeSetting, value: string | boolean | number) => {
   if (!can("system:config:write")) return;
   if (item.key.includes("cors.") || item.key.includes("ip."))
@@ -169,33 +138,30 @@ const save = async (item: RuntimeSetting, value: string | boolean | number) => {
     settings.value[index] = response.data;
     if (item.type === "STRING")
       stringDrafts.value[item.key] = response.data.value;
-    const cacheResponse = await listRuntimeCaches();
-    caches.value = cacheResponse.data;
+    caches.value = (await listRuntimeCaches()).data;
     message("配置已保存", { type: "success" });
   } finally {
     saving.value = undefined;
   }
 };
+
 const saveStringDraft = async (item: RuntimeSetting) => {
   const value = stringDraft(item);
   if (value !== item.value) await save(item, value);
 };
+
 onMounted(load);
 </script>
 
 <template>
-  <div v-loading="loading" class="grid gap-4 lg:grid-cols-2">
-    <el-card
-      data-section="runtime-management"
-      shadow="never"
-      class="lg:col-span-2"
-    >
+  <div v-loading="loading" class="page-root config-page">
+    <el-card data-section="runtime-management" shadow="never">
       <template #header>
-        <div>
-          <b>{{ labels.runtime }}</b>
-          <p class="mt-1 text-xs text-gray-400">
-            管理配置缓存自动对账、服务依赖探测以及系统头像生成开关。
-          </p>
+        <div class="section-heading">
+          <div>
+            <b>{{ labels.runtime }}</b>
+            <p>管理配置缓存自动对账、运行状态检查周期和头像生成开关。</p>
+          </div>
         </div>
       </template>
       <el-empty
@@ -242,174 +208,189 @@ onMounted(load);
         </el-form-item>
       </el-form>
     </el-card>
+
     <el-card data-section="runtime-caches" shadow="never">
       <template #header>
-        <div class="flex items-center justify-between gap-3">
+        <div class="section-heading">
           <div>
             <b>配置缓存</b>
-            <p class="mt-1 text-xs text-gray-400">
-              业务请求只读取内存快照；自动任务按 revision 检查数据库变化。
-            </p>
+            <p>查看内存快照与数据库 revision 是否一致，并按需重新加载。</p>
           </div>
           <el-button
-            type="primary"
             :disabled="!can('system:config:write')"
             :loading="cachesRefreshing"
             @click="refreshAllCaches"
-            >从数据库刷新全部</el-button
           >
+            刷新全部
+          </el-button>
         </div>
       </template>
-      <div class="component-grid">
-        <article v-for="item in caches" :key="item.code">
-          <div class="flex items-center justify-between gap-2">
-            <b>{{ item.displayName }}</b>
-            <el-tag :type="item.synchronizedState ? 'success' : 'danger'">
-              {{ item.synchronizedState ? "已同步" : "待同步" }}
+      <el-table :data="caches" row-key="code" empty-text="暂无配置缓存">
+        <el-table-column label="缓存" min-width="190">
+          <template #default="{ row }">
+            <div class="cache-name">
+              <b>{{ row.displayName }}</b>
+              <code>{{ row.code }}</code>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag
+              :type="row.synchronizedState ? 'success' : 'danger'"
+              effect="plain"
+            >
+              {{ row.synchronizedState ? "已同步" : "待同步" }}
             </el-tag>
-          </div>
-          <p v-if="item.lastFailureMessage" class="cache-error">
-            {{ item.lastFailureMessage }}
-          </p>
-          <small>
-            内存 revision：{{ item.snapshotRevision }} · 数据库 revision：{{
-              item.databaseRevision
-            }} · 条目：{{ item.entryCount }}
-          </small>
-          <small>最近加载：{{ formatTime(item.lastReloadedAt) }}</small>
-          <el-button
-            link
-            type="primary"
-            :disabled="!can('system:config:write')"
-            :loading="cacheRefreshing === item.code"
-            @click="refreshCache(item.code)"
-            >从数据库重新加载</el-button
-          >
-        </article>
-      </div>
+          </template>
+        </el-table-column>
+        <el-table-column
+          prop="snapshotRevision"
+          label="内存 revision"
+          width="125"
+        />
+        <el-table-column
+          prop="databaseRevision"
+          label="数据库 revision"
+          width="135"
+        />
+        <el-table-column prop="entryCount" label="条目数" width="90" />
+        <el-table-column label="最近加载" min-width="170">
+          <template #default="{ row }">
+            {{ formatTime(row.lastReloadedAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="异常" min-width="180">
+          <template #default="{ row }">
+            <span :class="{ 'cache-error': row.lastFailureMessage }">
+              {{ row.lastFailureMessage || "—" }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="110" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              link
+              type="primary"
+              :disabled="!can('system:config:write')"
+              :loading="cacheRefreshing === row.code"
+              @click="refreshCache(row.code)"
+            >
+              重新加载
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
     </el-card>
-    <el-card data-section="service-dependencies" shadow="never">
+
+    <el-card data-section="configuration-groups" shadow="never">
       <template #header>
-        <div class="flex items-center justify-between gap-3">
+        <div class="section-heading">
           <div>
-            <b>服务依赖</b>
-            <p class="mt-1 text-xs text-gray-400">
-              独立探测 DiceBear 头像生成服务和本地存储，不触发配置缓存刷新。
-            </p>
+            <b>服务配置</b>
+            <p>按功能分类管理安全、访问控制和身份策略。</p>
           </div>
-          <el-button
-            type="primary"
-            :disabled="!can('system:config:write')"
-            :loading="dependenciesRefreshing"
-            @click="refreshAllDependencies"
-            >探测全部</el-button
-          >
         </div>
       </template>
-      <div class="component-grid">
-        <article v-for="item in components" :key="item.code">
-          <div class="flex items-center justify-between gap-2">
-            <b>{{ item.displayName }}</b>
-            <el-tag :type="componentTagType(item.status)">{{
-              item.status
-            }}</el-tag>
-          </div>
-          <p>{{ item.message || "暂无探测详情" }}</p>
-          <small>
-            失败次数：{{ item.consecutiveFailures }} · 延迟：{{
-              item.latencyMs ?? "—"
-            }} ms · 最近探测：{{ formatTime(item.lastCheckedAt) }}
-          </small>
-          <el-button
-            link
-            type="primary"
-            :disabled="!can('system:config:write')"
-            :loading="componentRefreshing === item.code"
-            @click="refreshComponent(item.code)"
-            >重新探测</el-button
-          >
-        </article>
-      </div>
+      <el-tabs class="configuration-tabs">
+        <el-tab-pane
+          v-for="group in otherGroups"
+          :key="group.name"
+          :label="labels[group.name]"
+        >
+          <el-empty v-if="!group.items.length" description="暂无此组配置" />
+          <el-form v-else label-position="top" class="setting-grid">
+            <el-form-item v-for="item in group.items" :key="item.key">
+              <template #label>
+                <el-tooltip
+                  :content="runtimeSettingTooltip(item)"
+                  placement="top-start"
+                >
+                  <span class="runtime-setting-label">{{
+                    runtimeSettingLabel(item)
+                  }}</span>
+                </el-tooltip>
+              </template>
+              <el-switch
+                v-if="item.type === 'BOOLEAN'"
+                :model-value="displayValue(item)"
+                :disabled="!can('system:config:write') || saving === item.key"
+                @update:model-value="value => save(item, value)"
+              />
+              <el-input-number
+                v-else-if="item.type === 'INTEGER'"
+                :model-value="numberValue(item)"
+                :disabled="!can('system:config:write') || saving === item.key"
+                @change="value => save(item, value ?? 0)"
+              />
+              <el-input
+                v-else
+                type="textarea"
+                :rows="3"
+                :model-value="stringDraft(item)"
+                :disabled="!can('system:config:write') || saving === item.key"
+                @update:model-value="value => updateStringDraft(item, value)"
+                @change="() => saveStringDraft(item)"
+              />
+              <div class="runtime-setting-help">
+                <span>{{ runtimeSettingDescription(item) }}</span>
+                <code>{{ item.key }}</code>
+              </div>
+            </el-form-item>
+          </el-form>
+        </el-tab-pane>
+      </el-tabs>
     </el-card>
-    <el-card v-for="group in otherGroups" :key="group.name" shadow="never"
-      ><template #header>{{ labels[group.name] }}</template
-      ><el-empty
-        v-if="!group.items.length"
-        description="暂无此组配置"
-      /><el-form v-else label-position="top"
-        ><el-form-item v-for="item in group.items" :key="item.key"
-          ><template #label
-            ><el-tooltip
-              :content="runtimeSettingTooltip(item)"
-              placement="top-start"
-              ><span class="runtime-setting-label">{{
-                runtimeSettingLabel(item)
-              }}</span></el-tooltip
-            ></template
-          ><el-switch
-            v-if="item.type === 'BOOLEAN'"
-            :model-value="displayValue(item)"
-            :disabled="!can('system:config:write') || saving === item.key"
-            @update:model-value="value => save(item, value)"
-          /><el-input-number
-            v-else-if="item.type === 'INTEGER'"
-            :model-value="numberValue(item)"
-            :disabled="!can('system:config:write') || saving === item.key"
-            @change="value => save(item, value ?? 0)"
-          /><el-input
-            v-else
-            type="textarea"
-            :rows="3"
-            :model-value="stringDraft(item)"
-            :disabled="!can('system:config:write') || saving === item.key"
-            @update:model-value="value => updateStringDraft(item, value)"
-            @change="() => saveStringDraft(item)"
-          />
-          <div class="runtime-setting-help">
-            <span>{{ runtimeSettingDescription(item) }}</span>
-            <code>{{ item.key }}</code>
-          </div></el-form-item
-        ></el-form
-      ></el-card
-    >
   </div>
 </template>
 
 <style scoped>
-.component-grid {
+.config-page {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.section-heading p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
 .runtime-settings-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px 24px;
 }
-.component-grid article {
+
+.setting-grid {
   display: grid;
-  gap: 8px;
-  padding: 14px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 24px;
+  padding-top: 8px;
 }
-.component-grid p,
-.component-grid small {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
+
+.cache-name {
+  display: grid;
+  gap: 2px;
 }
-.component-grid .cache-error {
+
+.cache-name code,
+.runtime-setting-help code {
+  font-family: var(--el-font-family);
+  color: var(--el-text-color-placeholder);
+}
+
+.cache-error {
   color: var(--el-color-danger);
 }
-@media (max-width: 760px) {
-  .component-grid {
-    grid-template-columns: 1fr;
-  }
-  .runtime-settings-grid {
-    grid-template-columns: 1fr;
-  }
-}
+
 .runtime-setting-label {
   cursor: help;
 }
@@ -425,8 +406,14 @@ onMounted(load);
   color: var(--el-text-color-secondary);
 }
 
-.runtime-setting-help code {
-  font-family: var(--el-font-family);
-  color: var(--el-text-color-placeholder);
+@media (max-width: 760px) {
+  .runtime-settings-grid,
+  .setting-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-heading {
+    align-items: flex-start;
+  }
 }
 </style>

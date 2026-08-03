@@ -35,12 +35,21 @@ const configPage = await readFile(
   new URL("../src/views/system/config/index.vue", import.meta.url),
   "utf8"
 );
-assert.match(configPage, /const stringDrafts = ref<Record<string, string>>\(\{\}\)/);
-assert.match(configPage, /@update:model-value="value => updateStringDraft\(item, value\)"/);
+assert.match(
+  configPage,
+  /const stringDrafts = ref<Record<string, string>>\(\{\}\)/
+);
+assert.match(
+  configPage,
+  /@update:model-value="value => updateStringDraft\(item, value\)"/
+);
 assert.match(configPage, /@change="\(\) => saveStringDraft\(item\)"/);
 assert.match(configPage, />配置缓存</);
-assert.match(configPage, />服务依赖</);
 assert.doesNotMatch(configPage, />运行组件</);
+assert.match(configPage, /<el-table\s+:data="caches"/);
+assert.doesNotMatch(configPage, /listRuntimeChecks/);
+assert.doesNotMatch(configPage, /data-section="runtime-checks"/);
+assert.doesNotMatch(configPage, /data-section="runtime-status-overview"/);
 assert.ok(
   configPage.indexOf('data-section="runtime-management"') <
     configPage.indexOf('data-section="runtime-caches"'),
@@ -52,7 +61,21 @@ const runtimeApi = await readFile(
   "utf8"
 );
 assert.match(runtimeApi, /\/system\/runtime-caches/);
-assert.match(runtimeApi, /\/system\/dependencies/);
+assert.match(runtimeApi, /\/system\/runtime-checks/);
 assert.doesNotMatch(runtimeApi, /\/system\/runtime\/components/);
+
+const welcomePage = await readFile(
+  new URL("../src/views/welcome/index.vue", import.meta.url),
+  "utf8"
+);
+assert.match(welcomePage, /listRuntimeChecks/);
+assert.match(welcomePage, /refreshRuntimeChecks/);
+assert.match(welcomePage, /refreshRuntimeCheck/);
+assert.match(welcomePage, /const healthRows = computed/);
+assert.match(welcomePage, /const hasDisabledCheck = computed/);
+assert.match(welcomePage, /const overallText = computed/);
+assert.match(welcomePage, /\? "部分停用"/);
+assert.match(welcomePage, /data-section="service-health"/);
+assert.match(welcomePage, /<el-table\s+:data="healthRows"/);
 
 console.log("runtime config contracts passed");

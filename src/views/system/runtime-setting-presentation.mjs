@@ -19,8 +19,8 @@ const definitions = {
   "identity.registration.enabled": ["开放自助注册", "控制访客是否可以自行注册新账号。"],
   "runtime.config-refresh.enabled": ["自动刷新配置缓存", "按设定周期比较 revision，只重载发生变化的内存配置缓存。"],
   "runtime.config-refresh.interval-seconds": ["缓存检查周期", "自动检查配置缓存数据库 revision 的周期，单位：秒。"],
-  "runtime.dependency-health.enabled": ["自动探测服务依赖", "按设定周期检查头像生成服务和本地存储的可用状态。"],
-  "runtime.dependency-health.interval-seconds": ["依赖探测周期", "自动刷新服务依赖健康状态的周期，单位：秒。"],
+  "runtime.health-check.enabled": ["自动执行运行检查", "按设定周期检查服务依赖和本地资源的运行状态。"],
+  "runtime.health-check.interval-seconds": ["运行检查周期", "自动刷新全部运行状态检查的周期，单位：秒。"],
   "avatar.generator.enabled": ["启用系统头像生成", "控制是否允许创建或惰性生成新的 Lorelei 系统头像。"]
 };
 
