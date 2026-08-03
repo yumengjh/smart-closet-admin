@@ -10,8 +10,10 @@ import {
 } from "./build/utils";
 
 export default ({ mode }: ConfigEnv): UserConfigExport => {
+  const loadedEnv = loadEnv(mode, root);
   const { VITE_CDN, VITE_PORT, VITE_COMPRESSION, VITE_PUBLIC_PATH } =
-    wrapperEnv(loadEnv(mode, root));
+    wrapperEnv(loadedEnv);
+  const apiTarget = loadedEnv.VITE_API_TARGET || "http://localhost:8081";
   return {
     base: VITE_PUBLIC_PATH,
     root,
@@ -28,7 +30,7 @@ export default ({ mode }: ConfigEnv): UserConfigExport => {
         ["/api", "/actuator", "/swagger-ui", "/v3/api-docs"].map(path => [
           path,
           {
-            target: process.env.VITE_API_TARGET || "http://localhost:8080",
+            target: apiTarget,
             changeOrigin: true
           }
         ])

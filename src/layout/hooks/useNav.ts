@@ -96,6 +96,10 @@ export function useNav() {
     router.push("/account/security");
   }
 
+  function openAvatarManager() {
+    emitter.emit("openAvatarManager", true);
+  }
+
   function backTopMenu() {
     router.push(getTopMenu()?.path);
   }
@@ -146,6 +150,7 @@ export function useNav() {
     logout,
     refreshSession,
     openAccountSecurity,
+    openAvatarManager,
     routers,
     $storage,
     isFullscreen,

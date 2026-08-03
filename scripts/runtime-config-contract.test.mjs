@@ -38,5 +38,21 @@ const configPage = await readFile(
 assert.match(configPage, /const stringDrafts = ref<Record<string, string>>\(\{\}\)/);
 assert.match(configPage, /@update:model-value="value => updateStringDraft\(item, value\)"/);
 assert.match(configPage, /@change="\(\) => saveStringDraft\(item\)"/);
+assert.match(configPage, />配置缓存</);
+assert.match(configPage, />服务依赖</);
+assert.doesNotMatch(configPage, />运行组件</);
+assert.ok(
+  configPage.indexOf('data-section="runtime-management"') <
+    configPage.indexOf('data-section="runtime-caches"'),
+  "运行时管理配置卡应位于配置缓存之前"
+);
+
+const runtimeApi = await readFile(
+  new URL("../src/api/runtime-config.ts", import.meta.url),
+  "utf8"
+);
+assert.match(runtimeApi, /\/system\/runtime-caches/);
+assert.match(runtimeApi, /\/system\/dependencies/);
+assert.doesNotMatch(runtimeApi, /\/system\/runtime\/components/);
 
 console.log("runtime config contracts passed");

@@ -7,6 +7,8 @@ export type AdminUser = {
   username: string;
   displayName: string;
   status: UserStatus;
+  avatarUrl: string;
+  avatarType: "SYSTEM_INITIAL" | "SYSTEM_RANDOM" | "UPLOADED";
   roles: string[];
 };
 export type PageResponse<T> = {
@@ -35,3 +37,8 @@ export const updateUserStatus = (id: string, status: UserStatus) =>
   });
 export const revokeUserSessions = (id: string) =>
   http.request<void>("post", `/admin/users/${id}/sessions/revoke`);
+export const resetUserAvatar = (id: string) =>
+  http.request<ApiResponse<AdminUser>>(
+    "post",
+    "/admin/users/" + id + "/avatar/reset"
+  );

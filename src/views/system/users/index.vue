@@ -3,6 +3,7 @@ import {
   getAdminUser,
   listUsers,
   revokeUserSessions,
+  resetUserAvatar,
   updateUserStatus,
   type AdminUser,
   type UserStatus
@@ -90,6 +91,17 @@ const revoke = async () => {
   await revokeUserSessions(selected.value.id);
   message("用户会话已撤销", { type: "success" });
 };
+const resetAvatar = async () => {
+  if (!selected.value) return;
+  await ElMessageBox.confirm(
+    "将把该用户恢复为初始系统头像，不会撤销登录会话，是否继续？",
+    "重置头像",
+    { type: "warning" }
+  );
+  selected.value = (await resetUserAvatar(selected.value.id)).data;
+  await load();
+  message("用户头像已重置", { type: "success" });
+};
 onMounted(load);
 </script>
 
@@ -133,6 +145,10 @@ onMounted(load);
         </div></template
       >
       <el-table v-loading="loading" :data="rows" @row-click="openDetail"
+        ><el-table-column label="头像" width="68"
+          ><template #default="{ row }"
+            ><el-avatar :size="40" :src="row.avatarUrl" /></template
+          ></el-table-column
         ><el-table-column
           prop="username"
           label="用户名"
@@ -199,13 +215,34 @@ onMounted(load);
     </el-card>
     <el-drawer v-model="drawer" title="用户详情" size="480px"
       ><div v-if="selected" v-loading="detailLoading" class="space-y-5">
+        <div class="flex items-center gap-4">
+          <el-avatar :size="80" :src="selected.avatarUrl" />
+          <div>
+            <strong>{{ selected.displayName }}</strong>
+            <p class="mt-1 text-sm text-gray-400">{{ selected.username }}</p>
+          </div>
+        </div>
         <el-descriptions :column="1" border
           ><el-descriptions-item label="用户名">{{
             selected.username
           }}</el-descriptions-item
           ><el-descriptions-item label="显示名">{{
             selected.displayName
+          }}</el-descriptions-item
+          ><el-descriptions-item label="头像类型">{{
+            {
+              SYSTEM_INITIAL: "初始系统头像",
+              SYSTEM_RANDOM: "随机系统头像",
+              UPLOADED: "用户上传"
+            }[selected.avatarType]
           }}</el-descriptions-item></el-descriptions
+        ><el-button
+          v-if="can('system:user:write')"
+          type="warning"
+          plain
+          @click="resetAvatar"
+          >重置为初始头像</el-button
+        >
         ><el-divider content-position="left">账号状态</el-divider
         ><el-select
           :model-value="selected.status"

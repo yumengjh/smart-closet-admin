@@ -17,8 +17,15 @@ export type CurrentUser = {
   username: string;
   displayName: string;
   status: "ACTIVE" | "LOCKED" | "DISABLED";
+  avatarUrl: string;
   roles: Array<string>;
   permissions: Array<string>;
+};
+
+export type AvatarCandidate = {
+  candidateId: string;
+  previewUrl: string;
+  expiresAt: string;
 };
 
 export type LoginPayload = {
@@ -70,3 +77,22 @@ export const listMySessions = () =>
   http.request<ApiResponse<Session[]>>("get", "/users/me/sessions");
 export const revokeAllMySessions = () =>
   http.request<void>("post", "/users/me/sessions/revoke");
+export const uploadMyAvatar = (file: File) => {
+  const data = new FormData();
+  data.append("file", file);
+  return http.request<ApiResponse<CurrentUser>>("put", "/users/me/avatar", {
+    data
+  });
+};
+export const resetMyAvatar = () =>
+  http.request<ApiResponse<CurrentUser>>("delete", "/users/me/avatar");
+export const createAvatarCandidate = () =>
+  http.request<ApiResponse<AvatarCandidate>>(
+    "post",
+    "/users/me/avatar/system-candidates"
+  );
+export const applyAvatarCandidate = (candidateId: string) =>
+  http.request<ApiResponse<CurrentUser>>(
+    "post",
+    "/users/me/avatar/system-candidates/" + candidateId + "/apply"
+  );

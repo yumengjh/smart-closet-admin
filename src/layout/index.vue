@@ -30,6 +30,7 @@ import LaySetting from "./components/lay-setting/index.vue";
 import NavVertical from "./components/lay-sidebar/NavVertical.vue";
 import NavHorizontal from "./components/lay-sidebar/NavHorizontal.vue";
 import BackTopIcon from "@/assets/svg/back_top.svg?component";
+import AvatarManagerDialog from "./components/avatar-manager/AvatarManagerDialog.vue";
 
 const appWrapperRef = ref();
 const { isDark } = useDark();
@@ -158,6 +159,7 @@ const LayHeader = defineComponent({
 
 <template>
   <div ref="appWrapperRef" :class="['app-wrapper', set.classes]">
+    <AvatarManagerDialog />
     <div
       v-show="
         set.device === 'mobile' &&

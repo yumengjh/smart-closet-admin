@@ -14,5 +14,7 @@ export const getGcSchedule=()=>http.request<ApiResponse<GcSchedule>>("get","/sys
 export const updateGcSchedule=(data:GcSchedule)=>http.request<ApiResponse<GcSchedule>>("put","/system/gc/schedule",{data});
 export const runGc=(dryRun:boolean,resourceCodes?:string[])=>http.request<ApiResponse<GcRun>>("post","/system/gc/runs",{data:{dryRun,resourceCodes}});
 export const getGcRuns=(params?:{page?:number;size?:number})=>http.request<ApiResponse<{items:GcRun[];totalElements:number}>>("get","/system/gc/runs",{params});
+export type StorageReport={scannedAt:string;totalObjects:number;totalBytes:number;userReferencedObjects:number;candidateReferencedObjects:number;orphanObjects:number;missingFileObjects:number;untrackedFiles:number;temporaryFiles:number;usableBytes:number;capacityBytes:number};
+export const getStorageReport=()=>http.request<ApiResponse<StorageReport>>("get","/system/storage/report");
 export type SqlResult={query:boolean;updateCount:number;rows:Record<string,unknown>[]};
 export const executeSql=(sql:string,confirmDangerous:boolean)=>http.request<ApiResponse<SqlResult>>("post","/system/sql-console/execute",{data:{sql,confirmDangerous}});

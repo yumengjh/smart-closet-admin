@@ -13,6 +13,7 @@ import LaySidebarFullScreen from "../lay-sidebar/components/SidebarFullScreen.vu
 import LogoutCircleRLine from "~icons/ri/logout-circle-r-line";
 import RefreshLine from "~icons/ri/refresh-line";
 import UserSettingsLine from "~icons/ri/user-settings-line";
+import UserSmileLine from "~icons/ri/user-smile-line";
 import Setting from "~icons/ri/settings-3-line";
 
 const menuRef = ref();
@@ -28,6 +29,7 @@ const {
   logout,
   refreshSession,
   openAccountSecurity,
+  openAvatarManager,
   onPanel,
   getLogo,
   username,
@@ -89,6 +91,10 @@ onMounted(() => {
         </span>
         <template #dropdown>
           <el-dropdown-menu class="logout">
+            <el-dropdown-item @click="openAvatarManager">
+              <IconifyIconOffline :icon="UserSmileLine" style="margin: 5px" />
+              更换头像
+            </el-dropdown-item>
             <el-dropdown-item @click="openAccountSecurity">
               <IconifyIconOffline
                 :icon="UserSettingsLine"

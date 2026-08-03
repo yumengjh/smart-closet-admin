@@ -82,12 +82,13 @@ export const useUserStore = defineStore("pure-user", {
     async loadProfile() {
       const response = await getCurrentUser();
       const user = response.data;
+      this.SET_AVATAR(user.avatarUrl);
       this.SET_USERNAME(user.username);
       this.SET_NICKNAME(user.displayName);
       this.SET_ROLES(user.roles);
       this.SET_PERMS(user.permissions);
       setUserInfo({
-        avatar: this.avatar,
+        avatar: user.avatarUrl,
         username: user.username,
         nickname: user.displayName,
         roles: user.roles,
@@ -95,6 +96,7 @@ export const useUserStore = defineStore("pure-user", {
       });
     },
     clearSession() {
+      this.avatar = "";
       this.username = "";
       this.nickname = "";
       this.roles = [];

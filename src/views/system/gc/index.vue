@@ -3,13 +3,15 @@ import {
   getGcPolicies,
   getGcRuns,
   getGcSchedule,
+  getStorageReport,
   runGc,
   updateGcSchedule,
   updateGcPolicy,
   type GcPolicy,
   type GcRun,
   type GcRunResource,
-  type GcSchedule
+  type GcSchedule,
+  type StorageReport
 } from "@/api/maintenance";
 import { message } from "@/utils/message";
 import { ElMessageBox } from "element-plus";
@@ -30,6 +32,18 @@ const triggerFilter = ref<"ALL" | "MANUAL" | "SCHEDULED">("ALL");
 const statusFilter = ref<"ALL" | "SUCCEEDED" | "SKIPPED" | "FAILED">("ALL");
 const detail = ref<GcRun>();
 const drawer = ref(false);
+const storageReport = ref<StorageReport>();
+const formatBytes = (value = 0) => {
+  if (value < 1024) return value + " B";
+  const units = ["KiB", "MiB", "GiB", "TiB"];
+  let current = value;
+  let index = -1;
+  do {
+    current /= 1024;
+    index++;
+  } while (current >= 1024 && index < units.length - 1);
+  return current.toFixed(current >= 10 ? 1 : 2) + " " + units[index];
+};
 
 const formatDate = (value?: string) =>
   value ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "—";
@@ -60,14 +74,17 @@ const filteredRuns = computed(() => runs.value.filter(run =>
 const load = async () => {
   loading.value = true;
   try {
-    const [policyResponse, runResponse, scheduleResponse] = await Promise.all([
+    const [policyResponse, runResponse, scheduleResponse, storageResponse] =
+      await Promise.all([
       getGcPolicies(),
       getGcRuns({ page: 0, size: 100 }),
-      getGcSchedule()
+      getGcSchedule(),
+      getStorageReport()
     ]);
     policies.value = policyResponse.data;
     runs.value = runResponse.data.items;
     schedule.value = scheduleResponse.data;
+    storageReport.value = storageResponse.data;
     dirtyCodes.value = [];
   } finally {
     loading.value = false;
@@ -153,6 +170,24 @@ onMounted(load);
           <el-card shadow="never" class="metric-card"><span>自动维护资源</span><strong>{{ policyHealth }} <em>/ {{ policies.length }}</em></strong><small>已启用且参与定时任务的资源</small></el-card>
           <el-card shadow="never" class="metric-card"><span>最近任务状态</span><strong><el-tag :type="statusType(runs[0]?.status || 'SKIPPED')" effect="light">{{ runs[0] ? statusLabel(runs[0].status) : "暂无记录" }}</el-tag></strong><small>{{ runs[0] ? `${actionLabel(runs[0])} · ${sourceLabel(runs[0].triggerType)}` : "" }}</small></el-card>
         </div>
+        <el-card v-if="storageReport" shadow="never" class="overview-card">
+          <template #header
+            ><div class="card-title">
+              <div>
+                <b>本地存储利用率</b>
+                <span>扫描于 {{ formatDate(storageReport.scannedAt) }}，数据库与文件系统联合核对</span>
+              </div>
+              <el-button link type="primary" @click="load">重新扫描</el-button>
+            </div></template
+          >
+          <div class="storage-metrics">
+            <div><span>登记对象</span><strong>{{ storageReport.totalObjects }}</strong><small>{{ formatBytes(storageReport.totalBytes) }}</small></div>
+            <div><span>用户引用</span><strong>{{ storageReport.userReferencedObjects }}</strong><small>候选引用 {{ storageReport.candidateReferencedObjects }}</small></div>
+            <div><span>元数据孤儿</span><strong>{{ storageReport.orphanObjects }}</strong><small>未登记文件 {{ storageReport.untrackedFiles }}</small></div>
+            <div><span>异常文件</span><strong>{{ storageReport.missingFileObjects }}</strong><small>临时文件 {{ storageReport.temporaryFiles }}</small></div>
+            <div><span>磁盘可用</span><strong>{{ formatBytes(storageReport.usableBytes) }}</strong><small>总容量 {{ formatBytes(storageReport.capacityBytes) }}</small></div>
+          </div>
+        </el-card>
         <el-card shadow="never" class="overview-card">
           <template #header><div class="card-title"><div><b>资源状态</b><span>将最近一次预览与真实执行分开展示</span></div><el-button link type="primary" @click="activeTab = 'policies'">管理策略</el-button></div></template>
           <div class="resource-health-grid">
@@ -211,9 +246,10 @@ onMounted(load);
 <style scoped>
 .gc-page { padding: 20px; max-width: 1500px; margin: 0 auto; }.gc-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; }.gc-toolbar h2 { margin: 0; font-size: 20px; }.gc-toolbar p { margin: 5px 0 0; color: var(--el-text-color-secondary); font-size: 13px; }.gc-toolbar-actions { flex: none; white-space: nowrap; }.gc-tip { margin-top: 16px; }.gc-tabs { margin-top: 10px; }
 .metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }.metric-card :deep(.el-card__body) { display: grid; min-height: 122px; align-content: space-between; }.metric-card span,.metric-card small { color: var(--el-text-color-secondary); }.metric-card strong { color: var(--el-text-color-primary); font-size: 22px; }.metric-card em { font-size: 14px; font-style: normal; font-weight: 500; }.overview-card { margin-top: 16px; }.card-title,.history-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }.card-title b,.history-header b { display: block; }.card-title span,.history-header span { display: block; margin-top: 5px; color: var(--el-text-color-secondary); font-size: 13px; }
+.storage-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }.storage-metrics div { display: grid; gap: 5px; padding: 12px; border-radius: 7px; background: var(--el-fill-color-lighter); }.storage-metrics span,.storage-metrics small { color: var(--el-text-color-secondary); font-size: 12px; }.storage-metrics strong { font-size: 18px; }
 .resource-health-grid,.policy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }.resource-health-card { padding: 17px; border: 1px solid var(--el-border-color-lighter); border-radius: 8px; }.resource-health-head,.policy-card-head { display: flex; justify-content: space-between; gap: 16px; }.resource-health-head b,.policy-card-head b { font-size: 15px; }.resource-health-head p,.policy-card-head p { margin: 6px 0 0; color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.5; }.resource-health-values { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 16px 0; }.resource-health-values div { display: grid; gap: 5px; }.resource-health-values span,.resource-health-time { color: var(--el-text-color-secondary); font-size: 12px; }.resource-health-values strong { font-size: 20px; }.resource-health-time { margin: 0; }
 .schedule-card { margin-bottom: 16px; }.schedule-body { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; color: var(--el-text-color-secondary); font-size: 13px; }.schedule-body label { display: flex; align-items: center; gap: 10px; color: var(--el-text-color-primary); }.schedule-body :deep(.el-input-number) { width: 150px; }.schedule-body small { width: 100%; }.policy-card :deep(.el-card__header) { padding-bottom: 15px; }.policy-form { display: grid; gap: 15px; }.policy-form label { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }.policy-form :deep(.el-input-number) { width: 156px; }.switch-line span { display: grid; gap: 4px; }.switch-line small { color: var(--el-text-color-secondary); }.policy-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--el-border-color-lighter); color: var(--el-text-color-secondary); font-size: 12px; }.policy-footer > span { max-width: 56%; line-height: 1.45; }
 .history-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }.filter-select { width: 130px; }.task-name { display: grid; gap: 3px; }.task-name span,.muted { color: var(--el-text-color-secondary); font-size: 12px; }.result-pills { display: flex; flex-wrap: wrap; gap: 6px; }.run-detail { padding: 0 4px; }.detail-results { display: grid; gap: 10px; }.detail-results article,.detail-total { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 14px; border-radius: 7px; background: var(--el-fill-color-lighter); }.detail-results article div { display: grid; gap: 4px; }.detail-results article span { color: var(--el-text-color-secondary); font-size: 12px; }.detail-results article strong { color: var(--el-color-primary); font-size: 13px; }.detail-total { margin-top: 2px; background: #eff6ff; }.detail-total b { color: #1d4ed8; }.trace-id { overflow-wrap: anywhere; color: var(--el-text-color-secondary); font-family: monospace; font-size: 12px; }
-@media (max-width: 900px) { .gc-page { padding: 14px; }.gc-toolbar { align-items: flex-start; flex-direction: column; }.gc-toolbar-actions { width: 100%; display: flex; }.gc-toolbar-actions .el-button { flex: 1; }.metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.resource-health-grid,.policy-grid { grid-template-columns: 1fr; } }
-@media (max-width: 560px) { .gc-page { padding: 10px; }.metrics-grid { grid-template-columns: 1fr; }.resource-health-values { padding-bottom: 12px; }.policy-footer { align-items: flex-start; flex-direction: column; }.policy-footer > span { max-width: none; }.policy-footer > div { align-self: flex-end; }.history-header { align-items: flex-start; }.history-filters { display: grid; grid-template-columns: 1fr; }.filter-select { width: 100%; }.result-pills { max-width: 240px; }.detail-results article { align-items: flex-start; flex-direction: column; gap: 8px; } }
+@media (max-width: 900px) { .gc-page { padding: 14px; }.gc-toolbar { align-items: flex-start; flex-direction: column; }.gc-toolbar-actions { width: 100%; display: flex; }.gc-toolbar-actions .el-button { flex: 1; }.metrics-grid,.storage-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }.resource-health-grid,.policy-grid { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .gc-page { padding: 10px; }.metrics-grid,.storage-metrics { grid-template-columns: 1fr; }.resource-health-values { padding-bottom: 12px; }.policy-footer { align-items: flex-start; flex-direction: column; }.policy-footer > span { max-width: none; }.policy-footer > div { align-self: flex-end; }.history-header { align-items: flex-start; }.history-filters { display: grid; grid-template-columns: 1fr; }.filter-select { width: 100%; }.result-pills { max-width: 240px; }.detail-results article { align-items: flex-start; flex-direction: column; gap: 8px; } }
 </style>
