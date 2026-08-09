@@ -4,7 +4,6 @@ import {
   listRuntimeSettings,
   refreshRuntimeCache,
   refreshRuntimeCaches,
-  settingGroups,
   updateRuntimeSetting,
   type RuntimeCache,
   type RuntimeSetting
@@ -33,24 +32,45 @@ const stringDrafts = ref<Record<string, string>>({});
 const labels: Record<string, string> = {
   security: "安全审计",
   rateLimit: "全局限流",
+  ipProtection: "自动 IP 防护",
+  controlPlane: "管理控制面",
   cors: "跨域策略",
   endpointPolicy: "端点策略",
-  ipPolicy: "IP 策略",
   identity: "身份注册",
+  maintenance: "数据清理",
   runtime: "运行时管理"
 };
 
-const byKey = computed(
-  () => new Map(settings.value.map(item => [item.key, item]))
-);
-const groups = computed(() =>
-  Object.entries(settingGroups).map(([name, keys]) => ({
-    name,
-    items: keys
-      .map(key => byKey.value.get(key))
-      .filter(Boolean) as RuntimeSetting[]
-  }))
-);
+const preferredGroupOrder = [
+  "runtime",
+  "security",
+  "rateLimit",
+  "ipProtection",
+  "controlPlane",
+  "endpointPolicy",
+  "cors",
+  "identity",
+  "maintenance"
+];
+const groupRank = (name: string) => {
+  const rank = preferredGroupOrder.indexOf(name);
+  return rank < 0 ? preferredGroupOrder.length : rank;
+};
+const groups = computed(() => {
+  const grouped = new Map<string, RuntimeSetting[]>();
+  settings.value.forEach(item => {
+    const items = grouped.get(item.group) || [];
+    items.push(item);
+    grouped.set(item.group, items);
+  });
+  return [...grouped.entries()]
+    .map(([name, items]) => ({ name, items }))
+    .sort(
+      (left, right) =>
+        groupRank(left.name) - groupRank(right.name) ||
+        left.name.localeCompare(right.name)
+    );
+});
 const runtimeGroup = computed(() =>
   groups.value.find(group => group.name === "runtime")
 );
@@ -125,7 +145,7 @@ const updateStringDraft = (item: RuntimeSetting, value: string) => {
 
 const save = async (item: RuntimeSetting, value: string | boolean | number) => {
   if (!can("system:config:write")) return;
-  if (item.key.includes("cors.") || item.key.includes("ip."))
+  if (item.dangerous)
     await ElMessageBox.confirm(
       "此配置会立即影响请求访问策略，确认保存？",
       "高风险配置",
@@ -189,6 +209,8 @@ onMounted(load);
           <el-input-number
             v-else-if="item.type === 'INTEGER'"
             :model-value="numberValue(item)"
+            :min="item.minValue"
+            :max="item.maxValue"
             :disabled="!can('system:config:write') || saving === item.key"
             @change="value => save(item, value ?? 0)"
           />
@@ -214,7 +236,7 @@ onMounted(load);
         <div class="section-heading">
           <div>
             <b>配置缓存</b>
-            <p>查看内存快照与数据库 revision 是否一致，并按需重新加载。</p>
+            <p>查看最近一次检查时的 revision 结果，并按需重新加载。</p>
           </div>
           <el-button
             :disabled="!can('system:config:write')"
@@ -234,13 +256,13 @@ onMounted(load);
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="90">
+        <el-table-column label="最近状态" width="100">
           <template #default="{ row }">
             <el-tag
               :type="row.synchronizedState ? 'success' : 'danger'"
               effect="plain"
             >
-              {{ row.synchronizedState ? "已同步" : "待同步" }}
+              {{ row.synchronizedState ? "一致" : "待同步" }}
             </el-tag>
           </template>
         </el-table-column>
@@ -320,6 +342,8 @@ onMounted(load);
               <el-input-number
                 v-else-if="item.type === 'INTEGER'"
                 :model-value="numberValue(item)"
+                :min="item.minValue"
+                :max="item.maxValue"
                 :disabled="!can('system:config:write') || saving === item.key"
                 @change="value => save(item, value ?? 0)"
               />

@@ -63,6 +63,10 @@ const runtimeApi = await readFile(
 assert.match(runtimeApi, /\/system\/runtime-caches/);
 assert.match(runtimeApi, /\/system\/runtime-checks/);
 assert.doesNotMatch(runtimeApi, /\/system\/runtime\/components/);
+assert.doesNotMatch(runtimeApi, /security\.ip\.(allow|deny)-list/);
+assert.match(configPage, /item\.group/);
+assert.match(configPage, /:min="item\.minValue"/);
+assert.match(configPage, /:max="item\.maxValue"/);
 
 const welcomePage = await readFile(
   new URL("../src/views/welcome/index.vue", import.meta.url),

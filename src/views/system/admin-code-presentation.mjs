@@ -45,6 +45,17 @@ const definitions = {
   ipScope: {
     API: ["API 接口", "规则仅作用于 API 接口请求。"]
   },
+  ipRuleSource: {
+    MANUAL: ["人工规则", "由管理员手动创建的访问规则。"],
+    MIGRATED: ["历史迁移", "从旧版字符串 IP 策略迁移而来。"],
+    AUTO_RATE_LIMIT: ["自动限流封禁", "客户端持续触发请求限流后自动创建。"],
+    AUTO_LOGIN_ABUSE: ["自动登录防护", "客户端持续进行异常登录尝试后自动创建。"]
+  },
+  ipRuleStatus: {
+    ACTIVE: ["生效中", "该规则当前参与 IP 访问决策。"],
+    EXPIRED: ["已过期", "该规则已经超过有效期，不再参与访问决策。"],
+    REVOKED: ["已解除", "管理员已经解除该规则。"]
+  },
   auditResult: {
     SUCCESS: ["成功", "操作已成功完成。"],
     FAILURE: ["失败", "操作未能完成，请查看附加元数据了解原因。"]
@@ -80,7 +91,8 @@ const definitions = {
     PERMISSION_DELETED: ["删除权限", "删除了权限目录项及其授权关系。"],
     RUNTIME_SETTING_UPDATED: ["更新运行时配置", "修改了无需重启即可生效的配置。"],
     IP_ACCESS_RULE_CREATED: ["创建 IP 规则", "新增了一条 IP 访问规则。"],
-    IP_ACCESS_RULE_DELETED: ["删除 IP 规则", "删除了一条 IP 访问规则。"],
+    IP_ACCESS_RULE_REVOKED: ["解除 IP 规则", "解除了一条 IP 访问规则并保留历史。"],
+    IP_AUTO_BLOCKED: ["自动封禁 IP", "客户端持续触发限流后被临时封禁。"],
     ANNOUNCEMENT_CREATED: ["创建公告", "新增了一篇公告。"],
     ANNOUNCEMENT_UPDATED: ["更新公告", "修改了一篇公告。"],
     ANNOUNCEMENT_PUBLISHED: ["发布公告", "将公告设为公开可见。"],

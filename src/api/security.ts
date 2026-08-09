@@ -5,10 +5,20 @@ import type { PageResponse } from "./admin-users";
 export type IpAccessRule = {
   id: string;
   type: "ALLOW" | "DENY";
+  source: "MANUAL" | "AUTO_RATE_LIMIT" | "AUTO_LOGIN_ABUSE" | "MIGRATED";
+  status: "ACTIVE" | "EXPIRED" | "REVOKED";
   network: string;
   scope: string;
   expiresAt: number | null;
   reason: string;
+  triggerType: string | null;
+  violationCount: number;
+  firstTriggeredAt: number | null;
+  lastTriggeredAt: number | null;
+  blockedAt: number | null;
+  revokedAt: number | null;
+  createdAt: number | null;
+  updatedAt: number | null;
 };
 export type IpAccessRulePayload = {
   type: "ALLOW" | "DENY";
