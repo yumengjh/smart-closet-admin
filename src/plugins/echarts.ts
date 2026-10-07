@@ -10,6 +10,7 @@ import {
   GraphicComponent,
   ToolboxComponent,
   TooltipComponent,
+  DatasetComponent,
   DataZoomComponent,
   VisualMapComponent
 } from "echarts/components";
@@ -29,6 +30,7 @@ use([
   GraphicComponent,
   ToolboxComponent,
   TooltipComponent,
+  DatasetComponent,
   DataZoomComponent,
   VisualMapComponent
 ]);

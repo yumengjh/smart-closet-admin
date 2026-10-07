@@ -6,7 +6,8 @@ import {
 
 const registry = Object.fromEntries([
   "menu-management", "user-management", "rbac-management", "runtime-config",
-  "ip-rule-management", "audit-log", "announcement-management", "account-security"
+  "ip-rule-management", "audit-log", "announcement-management", "account-security",
+  "closet-users", "closet-insights"
 ].map(key => [key, `${key}Component`]));
 const routes = toAsyncRouteRecords(
   [{

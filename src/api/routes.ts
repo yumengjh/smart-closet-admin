@@ -18,6 +18,8 @@ export type NavigationRoute = {
     | "account-security"
     | "gc-management"
     | "sql-console"
+    | "closet-users"
+    | "closet-insights"
     | null;
   title: string;
   icon: string | null;

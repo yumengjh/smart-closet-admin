@@ -23,6 +23,8 @@ export type NavigationMenu = {
     | "account-security"
     | "gc-management"
     | "sql-console"
+    | "closet-users"
+    | "closet-insights"
     | null;
   icon: string | null;
   sortOrder: number;
