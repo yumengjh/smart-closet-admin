@@ -367,7 +367,7 @@ onMounted(async () => {
             <el-option label="模板审核" value="closet-templates" /></el-select
         ></el-form-item>
         <el-form-item label="图标"
-          ><el-input v-model="form.icon" placeholder="例如 Menu"
+          ><el-input v-model="form.icon" placeholder="例如 ri/menu-line"
         /></el-form-item>
         <el-form-item label="排序"
           ><el-input-number v-model="form.sortOrder" :min="0"

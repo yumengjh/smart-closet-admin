@@ -1,5 +1,6 @@
 {
-  "name": "pure-admin-thin",
+  "name": "smart-closet-admin",
+  "description": "鱼搭管理平台：独立的业务管理后台前端，通过中立管理接口接入鱼搭",
   "version": "6.2.0",
   "private": true,
   "type": "module",
@@ -21,32 +22,7 @@
     "prepare": "husky",
     "preinstall": "npx only-allow pnpm"
   },
-  "keywords": [
-    "pure-admin-thin",
-    "vue-pure-admin",
-    "element-plus",
-    "tailwindcss",
-    "pure-admin",
-    "typescript",
-    "pinia",
-    "vue3",
-    "vite",
-    "esm"
-  ],
-  "homepage": "https://github.com/pure-admin/pure-admin-thin",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/pure-admin/pure-admin-thin.git"
-  },
-  "bugs": {
-    "url": "https://github.com/pure-admin/vue-pure-admin/issues"
-  },
   "license": "MIT",
-  "author": {
-    "name": "xiaoxian521",
-    "email": "pureadmin@163.com",
-    "url": "https://github.com/xiaoxian521"
-  },
   "dependencies": {
     "@pureadmin/descriptions": "^1.2.1",
     "@pureadmin/table": "^3.3.0",

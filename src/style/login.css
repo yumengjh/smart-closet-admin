@@ -39,8 +39,9 @@
 }
 
 .avatar {
-  width: 350px;
+  display: block;
   height: 80px;
+  margin: 0 auto;
 }
 
 .login-form h2 {
@@ -72,8 +73,7 @@
   }
 
   .avatar {
-    width: 280px;
-    height: 80px;
+    height: 64px;
   }
 }
 

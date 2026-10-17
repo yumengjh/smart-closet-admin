@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import Motion from "@/views/login/utils/motion";
-import { reactive, ref, toRaw } from "vue";
+import { computed, reactive, ref, toRaw } from "vue";
 import { useRouter } from "vue-router";
 import type { FormInstance, FormRules } from "element-plus";
 import { registerApi } from "@/api/user";
 import { message } from "@/utils/message";
 import { useNav } from "@/layout/hooks/useNav";
-import { bg, avatar, illustration } from "@/views/login/utils/static";
+import {
+  bg,
+  logo,
+  illustrationLight,
+  illustrationDark
+} from "@/views/login/utils/static";
 import { useDataThemeChange } from "@/layout/hooks/useDataThemeChange";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import User from "~icons/ri/user-3-fill";
@@ -20,6 +25,9 @@ const loading = ref(false);
 const formRef = ref<FormInstance>();
 const { dataTheme, overallStyle, dataThemeChange } = useDataThemeChange();
 dataThemeChange(overallStyle.value);
+const illustration = computed(() =>
+  dataTheme.value ? illustrationDark : illustrationLight
+);
 
 const form = reactive({
   username: "",
@@ -94,7 +102,7 @@ async function submit() {
       <div class="img"><component :is="toRaw(illustration)" /></div>
       <div class="login-box">
         <div class="login-form">
-          <avatar class="avatar" />
+          <img :src="logo" alt="鱼搭" class="avatar" />
           <Motion
             ><h2 class="outline-hidden">注册 {{ title }}</h2></Motion
           >

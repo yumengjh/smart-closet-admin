@@ -3,7 +3,7 @@ import Motion from "./utils/motion";
 import { useRoute, useRouter } from "vue-router";
 import { message } from "@/utils/message";
 import { loginRules } from "./utils/rule";
-import { ref, reactive, toRaw } from "vue";
+import { ref, reactive, toRaw, computed } from "vue";
 import { debounce } from "@pureadmin/utils";
 import { useNav } from "@/layout/hooks/useNav";
 import { useEventListener } from "@vueuse/core";
@@ -11,7 +11,7 @@ import type { FormInstance } from "element-plus";
 import { useLayout } from "@/layout/hooks/useLayout";
 import { useUserStoreHook } from "@/store/modules/user";
 import { initRouter } from "@/router/utils";
-import { bg, avatar, illustration } from "./utils/static";
+import { bg, logo, illustrationLight, illustrationDark } from "./utils/static";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import { useDataThemeChange } from "@/layout/hooks/useDataThemeChange";
 
@@ -36,6 +36,9 @@ initStorage();
 const { dataTheme, overallStyle, dataThemeChange } = useDataThemeChange();
 dataThemeChange(overallStyle.value);
 const { title } = useNav();
+const illustration = computed(() =>
+  dataTheme.value ? illustrationDark : illustrationLight
+);
 
 const ruleForm = reactive({
   username: "",
@@ -97,7 +100,7 @@ useEventListener(document, "keydown", ({ code }) => {
       </div>
       <div class="login-box">
         <div class="login-form">
-          <avatar class="avatar" />
+          <img :src="logo" alt="鱼搭" class="avatar" />
           <Motion>
             <h2 class="outline-hidden">{{ title }}</h2>
           </Motion>

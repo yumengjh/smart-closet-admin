@@ -1,39 +1,20 @@
-<h1>vue-pure-admin Lite Edition（no i18n version）</h1>
+# Smart Closet Admin
 
-[![license](https://img.shields.io/github/license/pure-admin/vue-pure-admin.svg)](LICENSE)
+Standalone admin frontend for Smart Closet (鱼搭), built with Vue 3 and Element Plus. It talks to `smart-closet-admin-server`, which reaches the closet service through the neutral management API.
 
-**English** | [中文](./README.md)
+- Home: the business screen (users, wardrobe, outfits and recommendations at a glance), light or dark with the platform theme.
+- Closet: insights, business users, runtime monitoring, data export, template review.
+- System: users, roles and permissions, menus, runtime config, IP rules, audit log, data cleanup, SQL console, and the platform's own runtime overview.
 
-## Introduce
+## Development
 
-The simplified version is based on the shelf extracted from [vue-pure-admin](https://github.com/pure-admin/vue-pure-admin), which contains main functions and is more suitable for actual project development. The packaged size is introduced globally [element-plus](https://element-plus.org) is still below `2.3MB`, and the full version of the code will be permanently synchronized. After enabling `brotli` compression and `cdn` to replace the local library mode, the package size is less than `350kb`
+```bash
+pnpm install
+pnpm dev        # http://localhost:8849, API proxied to VITE_API_TARGET (default http://127.0.0.1:8081)
+pnpm typecheck
+pnpm build
+```
 
-## Supporting video
+Menu icons come from the backend as keys registered in `src/components/ReIcon/src/offlineIcon.ts` (for example `ri/pulse-line`).
 
-[Click me to view UI design](https://www.bilibili.com/video/BV17g411T7rq)  
-[Click me to view the rapid development tutorial](https://www.bilibili.com/video/BV1kg411v7QT)
-
-## Nanny-level documents
-
-[Click me to view vue-pure-admin documentation](https://pure-admin.cn/)  
-[Click me to view @pureadmin/utils documentation](https://pure-admin-utils.netlify.app)
-
-## Premium service
-
-[Click me to view details](https://pure-admin.cn/pages/service/)
-
-## Preview
-
-[Click me to view the preview station](https://pure-admin-thin.netlify.app/#/login)
-
-## Maintainer
-
-[xiaoxian521](https://github.com/xiaoxian521)
-
-## ⚠️ Attention
-
-The Lite version does not accept any issues and prs. If you have any questions, please go to the full version [issues](https://github.com/pure-admin/vue-pure-admin/issues/new/choose) to mention, thank you!
-
-## License
-
-[MIT © 2020-present, pure-admin](./LICENSE)
+Based on [pure-admin-thin](https://github.com/pure-admin/pure-admin-thin) (MIT).

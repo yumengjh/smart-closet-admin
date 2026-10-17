@@ -1,43 +1,26 @@
-<h1>vue-pure-admin精简版（非国际化版本）</h1>
+# 鱼搭管理平台
 
-[![license](https://img.shields.io/github/license/pure-admin/vue-pure-admin.svg)](LICENSE)
+鱼搭（数字衣柜）的独立管理后台前端，Vue 3 + Element Plus。通过 `smart-closet-admin-server` 以中立管理接口接入鱼搭业务服务，不改动鱼搭本体。
 
-**中文** | [English](./README.en-US.md)
+- 首页：业务大屏，展示用户、衣柜、搭配与推荐的实时概览，随平台主题切换浅色/深色。
+- 鱼搭业务：衣柜洞察、业务用户、运行监控、数据导出、模板审核。
+- 系统管理：用户、角色与权限、菜单、运行配置、IP 规则、审计日志、数据清理、SQL 执行台，以及平台自身的运行概览。
 
-## 介绍
+## 开发
 
-精简版是基于 [vue-pure-admin](https://github.com/pure-admin/vue-pure-admin) 提炼出的架子，包含主体功能，更适合实际项目开发，打包后的大小在全局引入 [element-plus](https://element-plus.org) 的情况下仍然低于 `2.3MB`，并且会永久同步完整版的代码。开启 `brotli` 压缩和 `cdn` 替换本地库模式后，打包大小低于 `350kb`
+```bash
+pnpm install
+pnpm dev        # 默认 http://localhost:8849，接口代理到 VITE_API_TARGET（默认 http://127.0.0.1:8081）
+pnpm typecheck
+pnpm build
+```
 
-## 版本选择
+后端见同级目录 `smart-closet-admin-server`；鱼搭本体需开启 `CLOSET_MANAGEMENT_ENABLED` 并与后端的 `APP_CLOSET_SECRET` 配置一致。
 
-当前是非国际化版本，如果您需要国际化版本 [请点击](https://github.com/pure-admin/pure-admin-thin/tree/i18n)
+## 菜单图标
 
-## 配套视频
+菜单由后端下发，`icon` 字段使用本地注册的图标键（如 `ri/pulse-line`）。新增图标需在 `src/components/ReIcon/src/offlineIcon.ts` 注册。
 
-[点我查看 UI 设计](https://www.bilibili.com/video/BV17g411T7rq)  
-[点我查看快速开发教程](https://www.bilibili.com/video/BV1kg411v7QT)
+## 致谢
 
-## 配套保姆级文档
-
-[点我查看 vue-pure-admin 文档](https://pure-admin.cn/)  
-[点我查看 @pureadmin/utils 文档](https://pure-admin-utils.netlify.app)
-
-## 高级服务
-
-[点我查看详情](https://pure-admin.cn/pages/service/)
-
-## 预览
-
-[查看预览](https://pure-admin-thin.netlify.app/#/login)
-
-## 维护者
-
-[xiaoxian521](https://github.com/xiaoxian521)
-
-## ⚠️ 注意
-
-精简版不接受任何 `issues` 和 `pr`，如果有问题请到完整版 [issues](https://github.com/pure-admin/vue-pure-admin/issues/new/choose) 去提，谢谢！
-
-## 许可证
-
-[MIT © 2020-present, pure-admin](./LICENSE)
+基于 [vue-pure-admin 精简版](https://github.com/pure-admin/pure-admin-thin)（MIT）。
