@@ -1,86 +1,56 @@
 <script setup lang="ts">
-import type { EChartsOption } from "echarts";
-import type { TrendInsight, TrendMetric } from "@/api/closet/insights";
+import { lineChart } from "./chartOptions";
+import {
+  metricNames,
+  type TrendInsight,
+  type TrendMetric
+} from "@/api/closet/insights";
 import ChartView from "./ChartView.vue";
 import { computed } from "vue";
 
 const props = defineProps<{
   trends: TrendInsight;
   metrics: TrendMetric[];
-  granularity: "day" | "week";
+  granularity: "day" | "week" | "month";
 }>();
 const emit = defineEmits<{
   "update:metrics": [value: TrendMetric[]];
-  "update:granularity": [value: "day" | "week"];
+  "update:granularity": [value: "day" | "week" | "month"];
 }>();
-const metricNames: Record<TrendMetric, string> = {
-  garments_created: "新增衣物",
-  garments_adopted: "采纳衣物",
-  outfits_created: "新增搭配",
-  quick_intakes: "快速入柜",
-  image_units: "图片处理用量",
-  agent_messages: "Agent 消息",
-  users_created: "新增用户"
-};
 const options = Object.entries(metricNames).map(([value, label]) => ({
   value,
   label
 }));
-const chartColors = [
-  "--el-color-primary",
-  "--el-color-success",
-  "--el-color-warning",
-  "--el-color-danger",
-  "--el-color-info",
-  "--el-color-primary-light-3",
-  "--el-color-success-light-3"
-]
-  .map(token =>
-    getComputedStyle(document.documentElement).getPropertyValue(token).trim()
-  )
-  .filter(Boolean);
 const setMetrics = (value: TrendMetric[]) => {
   if (value.length) emit("update:metrics", value);
 };
 const setGranularity = (value: string | number | boolean) => {
-  if (value === "day" || value === "week") emit("update:granularity", value);
+  if (value === "day" || value === "week" || value === "month")
+    emit("update:granularity", value);
 };
-const option = computed<EChartsOption>(() => ({
-  color: chartColors,
-  tooltip: { trigger: "axis" },
-  legend: {
-    type: "scroll",
-    top: 0,
-    data: props.trends.series.map(item => metricNames[item.metric])
-  },
-  grid: { left: 52, right: 24, top: 44, bottom: 42 },
-  xAxis: {
-    type: "category",
-    boundaryGap: false,
-    data: props.trends.buckets,
-    axisLabel: { hideOverlap: true }
-  },
-  yAxis: {
-    type: "value",
-    minInterval: 1,
-    splitLine: { lineStyle: { type: "dashed" } }
-  },
-  series: props.trends.series.map(item => ({
-    name: metricNames[item.metric],
-    type: "line",
-    smooth: false,
-    showSymbol: props.trends.buckets.length < 40,
-    emphasis: { focus: "series" },
-    data: item.values
-  }))
-}));
+const option = computed(() =>
+  lineChart(
+    props.trends.buckets.map(bucket =>
+      bucket.length === 10 ? bucket.slice(5) : bucket
+    ),
+    props.trends.series.map(item => ({
+      name: metricNames[item.metric],
+      values: item.values
+    }))
+  )
+);
 </script>
 
 <template>
   <el-card shadow="never">
     <template #header
       ><div class="flex flex-wrap items-center gap-3">
-        <span class="mr-auto">趋势</span>
+        <div class="mr-auto chart-heading">
+          <div>
+            <h3>业务趋势分析</h3>
+            <p>切换指标与粒度，比较区间变化</p>
+          </div>
+        </div>
         <el-select
           :model-value="metrics"
           multiple
@@ -101,8 +71,9 @@ const option = computed<EChartsOption>(() => ({
           :model-value="granularity"
           @update:model-value="setGranularity"
         >
-          <el-radio-button label="day">按日</el-radio-button
-          ><el-radio-button label="week">按周</el-radio-button>
+          <el-radio-button value="day">按日</el-radio-button
+          ><el-radio-button value="week">按周</el-radio-button
+          ><el-radio-button value="month">按月</el-radio-button>
         </el-radio-group>
       </div></template
     >

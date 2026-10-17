@@ -64,9 +64,17 @@ export type TrendMetric =
   | "quick_intakes"
   | "image_units"
   | "agent_messages"
-  | "users_created";
+  | "users_created"
+  | "active_users"
+  | "recommendations_shown"
+  | "recommendation_likes"
+  | "recommendation_dislikes"
+  | "wear_logs"
+  | "model_calls"
+  | "model_tokens"
+  | "ootd_samples";
 export type TrendInsight = {
-  granularity: "day" | "week";
+  granularity: "day" | "week" | "month";
   buckets: string[];
   series: Array<{ metric: TrendMetric; values: number[] }>;
 };
@@ -77,7 +85,7 @@ export type InsightDateParams = {
 };
 export type TrendParams = InsightDateParams & {
   metric: TrendMetric[];
-  granularity: "day" | "week";
+  granularity: "day" | "week" | "month";
 };
 
 const root = "/closet/insights";
@@ -117,3 +125,70 @@ export const closetFamilyLabels: Record<string, string> = {
 
 export const closetFamilyLabel = (code: string) =>
   closetFamilyLabels[code] ?? code;
+
+export type AdoptionRow = {
+  shown: number;
+  adopted: number;
+  adoptionRate: number | null;
+};
+export type RecommendationKpi = AdoptionRow & {
+  scope: InsightScope;
+  liked: number;
+  disliked: number;
+  likeRate: number | null;
+  openedInWorkspace: number;
+  wornWithin3Days: number;
+  swaps: number;
+  users: number;
+  bySource: Array<AdoptionRow & { source: string }>;
+  byRank: Array<AdoptionRow & { rank: number }>;
+  templates: Array<AdoptionRow & { template: string }>;
+  daily: Array<{ date: string; shown: number; adopted: number }>;
+  definition: string;
+};
+export type AiUsage = {
+  scope: InsightScope;
+  byFeature: Array<{
+    feature: string;
+    calls: number;
+    inputTokens: number;
+    outputTokens: number;
+    unknownUsage: number;
+  }>;
+  totals: { calls: number; inputTokens: number; outputTokens: number };
+  imageUnits: number;
+  agentMessages: number;
+  recommendations: {
+    total: number;
+    zeroModel: number;
+    zeroModelRatio: number | null;
+  };
+  topUsers?: Array<{ username: string; calls: number; tokens: number }>;
+  note: string;
+};
+export const getClosetRecommendations = (params: InsightDateParams) =>
+  http.request<ApiResponse<RecommendationKpi>>(
+    "get",
+    `${root}/recommendations`,
+    { params }
+  );
+export const getClosetAi = (params: InsightDateParams) =>
+  http.request<ApiResponse<AiUsage>>("get", `${root}/ai`, { params });
+
+export const metricNames: Record<TrendMetric, string> = {
+  garments_created: "新增衣物",
+  garments_adopted: "采纳衣物",
+  outfits_created: "新增搭配",
+  quick_intakes: "快速入柜",
+  image_units: "图片用量",
+  agent_messages: "助手消息",
+  users_created: "新增用户",
+  active_users: "活跃用户",
+  recommendations_shown: "推荐展示",
+  recommendation_likes: "推荐点赞",
+  recommendation_dislikes: "推荐点踩",
+  wear_logs: "穿搭打卡",
+  model_calls: "模型调用",
+  model_tokens: "模型 Token",
+  ootd_samples: "穿搭样本"
+};

@@ -358,7 +358,13 @@ onMounted(async () => {
               label="简历管理"
               value="resume-management" /><el-option
               label="账户安全"
-              value="account-security" /></el-select
+              value="account-security" />
+            <el-option label="鱼搭业务用户" value="closet-users" />
+            <el-option label="衣柜洞察" value="closet-insights" />
+            <el-option label="业务大屏" value="closet-dashboard" />
+            <el-option label="运行监控" value="closet-ops" />
+            <el-option label="数据导出" value="closet-exports" />
+            <el-option label="模板审核" value="closet-templates" /></el-select
         ></el-form-item>
         <el-form-item label="图标"
           ><el-input v-model="form.icon" placeholder="例如 Menu"

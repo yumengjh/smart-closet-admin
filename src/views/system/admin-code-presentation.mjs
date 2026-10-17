@@ -23,6 +23,25 @@ const definitions = {
     "example:announcement:read": ["查看公告管理内容", "允许读取公告管理数据。"],
     "example:announcement:write": ["创建、编辑与发布公告", "允许维护和发布公告。"],
     "example:announcement:delete": ["删除公告", "允许删除公告。"],
+    "closet:user:read": [
+      "查看鱼搭业务用户",
+      "读取鱼搭账号、会话、便携链接与额度。"
+    ],
+    "closet:user:write": [
+      "管理鱼搭业务用户",
+      "创建账号、管理状态、角色和会话。"
+    ],
+    "closet:user:reset-password": ["重置鱼搭密码", "生成一次性临时密码。"],
+    "closet:quota:write": ["调整鱼搭额度", "修改图片与助手每日额度。"],
+    "closet:insights:read": ["查看鱼搭洞察", "读取衣柜、推荐与 AI 指标。"],
+    "closet:ops:read": [
+      "查看鱼搭运行监控",
+      "只读健康状态、后台任务和操作日志。"
+    ],
+    "closet:dashboard:read": ["查看鱼搭大屏", "读取汇总业务快照。"],
+    "closet:exports:read": ["导出鱼搭数据", "读取按天宽表和去标识事件。"],
+    "closet:templates:read": ["查看鱼搭模板", "读取搭配模板和审核记录。"],
+    "closet:templates:write": ["审核鱼搭模板", "调整审核状态、启用与加分。"],
     "resume:manage": ["管理公开简历", "允许查看和编辑公开简历的全部内容。"]
   },
   navigationComponent: {
@@ -36,7 +55,13 @@ const definitions = {
     "audit-log": ["审计日志", "系统审计日志页面组件。"],
     "announcement-management": ["公告管理", "公告管理页面组件。"],
     "resume-management": ["简历管理", "公开简历内容管理页面组件。"],
-    "account-security": ["账户安全", "个人账户与会话安全页面组件。"]
+    "account-security": ["账户安全", "个人账户与会话安全页面组件。"],
+    "closet-users": ["鱼搭业务用户", "鱼搭业务账号管理。"],
+    "closet-insights": ["衣柜洞察", "衣柜、推荐与 AI 用量。"],
+    "closet-dashboard": ["业务大屏", "汇总业务趋势与分布。"],
+    "closet-ops": ["运行监控", "鱼搭只读运维。"],
+    "closet-exports": ["数据导出", "按天汇总与去标识事件。"],
+    "closet-templates": ["模板审核", "搭配模板人工审核。"]
   },
   ipRuleType: {
     ALLOW: ["允许访问", "命中该规则的 IP 或网段允许访问 API。"],
@@ -72,6 +97,7 @@ const definitions = {
     NavigationMenu: ["后台菜单", "后台动态导航菜单项。"]
   },
   auditAction: {
+    CLOSET_TEMPLATE_REVIEW: ["审核鱼搭模板", "修改模板审核状态、启用与加分。"],
     LOGIN_FAILED: ["登录失败", "用户登录验证未通过。"],
     LOGIN_SUCCEEDED: ["登录成功", "用户成功完成登录。"],
     TOKEN_REFRESHED: ["刷新登录会话", "使用刷新令牌签发了新的访问令牌。"],

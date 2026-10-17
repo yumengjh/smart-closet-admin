@@ -20,6 +20,10 @@ export type NavigationRoute = {
     | "sql-console"
     | "closet-users"
     | "closet-insights"
+    | "closet-dashboard"
+    | "closet-ops"
+    | "closet-exports"
+    | "closet-templates"
     | null;
   title: string;
   icon: string | null;

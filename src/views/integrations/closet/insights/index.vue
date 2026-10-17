@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import {
   getClosetOverview,
+  getClosetRecommendations,
+  getClosetAi,
+  type RecommendationKpi,
+  type AiUsage,
   getClosetTrends,
   getClosetUsage,
   getClosetWardrobe,
@@ -14,12 +18,16 @@ import { listClosetUsers, type ClosetUserSummary } from "@/api/closet/users";
 import { isClosetServiceUnavailable } from "@/api/closet/errors";
 import { useCurrentPermissions } from "@/composables/useCurrentPermissions";
 import ClosetUnavailable from "../ClosetUnavailable.vue";
+import "../analytics.css";
+import InsightIcon from "~icons/ri/bar-chart-box-line";
+import RefreshIcon from "~icons/ri/refresh-line";
 import OverviewCards from "./OverviewCards.vue";
 import WardrobeCharts from "./WardrobeCharts.vue";
 import UsagePanel from "./UsagePanel.vue";
+import KpiPanel from "./KpiPanel.vue";
 import TrendChart from "./TrendChart.vue";
 import { message } from "@/utils/message";
-import { onMounted, ref, watch } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 defineOptions({ name: "ClosetInsights" });
@@ -44,17 +52,20 @@ const users = ref<ClosetUserSummary[]>([]);
 const userLoading = ref(false);
 const loading = ref(false);
 const unavailable = ref(false);
+const errorMessage = ref("");
 const overview = ref<InsightOverview>();
 const wardrobe = ref<WardrobeInsight>();
 const usage = ref<UsageInsight>();
 const trends = ref<TrendInsight>();
+const recommendations = ref<RecommendationKpi>();
+const ai = ref<AiUsage>();
 const metrics = ref<TrendMetric[]>([
   "garments_created",
   "garments_adopted",
   "outfits_created",
   "quick_intakes"
 ]);
-const granularity = ref<"day" | "week">("day");
+const granularity = ref<"day" | "week" | "month">("day");
 let requestId = 0;
 
 const loadUsers = async (q = "") => {
@@ -102,32 +113,45 @@ const load = async () => {
   const current = ++requestId;
   loading.value = true;
   unavailable.value = false;
+  errorMessage.value = "";
   const scope = username.value || undefined;
   const [from, to] = dateRange.value;
   try {
-    const [overviewResult, wardrobeResult, usageResult, trendsResult] =
-      await Promise.all([
-        getClosetOverview({ username: scope, from, to }),
-        getClosetWardrobe({ username: scope }),
-        getClosetUsage({ username: scope }),
-        getClosetTrends({
-          username: scope,
-          from,
-          to,
-          metric: metrics.value,
-          granularity: granularity.value
-        })
-      ]);
+    const [
+      overviewResult,
+      wardrobeResult,
+      usageResult,
+      trendsResult,
+      recommendationResult,
+      aiResult
+    ] = await Promise.all([
+      getClosetOverview({ username: scope, from, to }),
+      getClosetWardrobe({ username: scope }),
+      getClosetUsage({ username: scope }),
+      getClosetTrends({
+        username: scope,
+        from,
+        to,
+        metric: metrics.value,
+        granularity: granularity.value
+      }),
+      getClosetRecommendations({ username: scope, from, to }),
+      getClosetAi({ username: scope, from, to })
+    ]);
     if (current !== requestId) return;
     overview.value = overviewResult.data;
     wardrobe.value = wardrobeResult.data;
     usage.value = usageResult.data;
     trends.value = trendsResult.data;
+    recommendations.value = recommendationResult.data;
+    ai.value = aiResult.data;
   } catch (error) {
     if (current !== requestId) return;
     if (isClosetServiceUnavailable(error)) unavailable.value = true;
-    else
-      message("读取衣柜洞察失败，请检查日期范围和筛选条件", { type: "error" });
+    else {
+      errorMessage.value = "读取衣柜洞察失败，请检查日期范围和筛选条件";
+      message(errorMessage.value, { type: "error" });
+    }
   } finally {
     if (current === requestId) loading.value = false;
   }
@@ -156,6 +180,9 @@ watch(
   },
   { deep: true }
 );
+onBeforeUnmount(() => {
+  requestId++;
+});
 onMounted(() => {
   if (can("closet:user:read")) void loadUsers(username.value);
   void load();
@@ -163,14 +190,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="closet-analytics space-y-5">
     <el-card shadow="never">
       <div class="flex flex-wrap items-center gap-3">
-        <h2 class="mr-auto text-lg font-semibold">衣柜洞察</h2>
+        <span class="analytics-symbol"><InsightIcon /></span>
+        <div class="analytics-title">
+          <h2>衣柜洞察</h2>
+          <p>推荐转化、资源消耗与衣柜构成</p>
+        </div>
         <el-select
           v-if="can('closet:user:read')"
           :model-value="username"
-          class="!w-64"
+          class="scope-select"
           filterable
           remote
           clearable
@@ -208,27 +239,46 @@ onMounted(() => {
           :unlink-panels="true"
           @update:model-value="setDateRange"
         />
-        <el-button type="primary" :loading="loading" @click="load"
+        <el-button
+          type="primary"
+          :icon="RefreshIcon"
+          :loading="loading"
+          @click="load"
           >刷新</el-button
         >
       </div>
-      <p class="mt-3 text-sm text-gray-500">
-        使用次数 =
-        出现在已保存搭配中的次数，鱼搭不记录实际穿着。采纳率按区间内录入且当前仍为有效状态的衣物计算，后续状态变化会影响结果。衣柜构成与搭配使用统计当前有效衣物，不受日期范围影响。
-      </p>
+      <el-collapse class="analytics-detail"
+        ><el-collapse-item title="统计口径说明"
+          ><p class="analytics-note">
+            使用次数 =
+            出现在已保存搭配中的次数；穿搭打卡另计。采纳率按区间内录入且当前仍为有效状态的衣物计算，后续状态变化会影响结果。衣柜构成与搭配使用统计当前有效衣物，不受日期范围影响。
+          </p>
+        </el-collapse-item></el-collapse
+      >
     </el-card>
     <ClosetUnavailable v-if="unavailable" :loading="loading" @retry="retry" />
+    <el-alert
+      v-else-if="errorMessage"
+      :title="errorMessage"
+      type="error"
+      :closable="false"
+    />
     <template v-else>
       <div v-loading="loading" class="space-y-4">
         <template v-if="overview && wardrobe && usage && trends">
           <OverviewCards :overview="overview" />
-          <WardrobeCharts :wardrobe="wardrobe" />
-          <UsagePanel :usage="usage" />
           <TrendChart
             v-model:metrics="metrics"
             v-model:granularity="granularity"
             :trends="trends"
           />
+          <KpiPanel
+            v-if="recommendations && ai"
+            :recommendations="recommendations"
+            :ai="ai"
+          />
+          <WardrobeCharts :wardrobe="wardrobe" />
+          <UsagePanel :usage="usage" />
           <p class="px-1 text-sm text-gray-500">
             数据映射版本：{{ overview.mappingVersion }} · 更新于
             {{ new Date(overview.generatedAtMs).toLocaleString() }}
@@ -238,3 +288,21 @@ onMounted(() => {
     </template>
   </div>
 </template>
+
+<style scoped>
+.scope-select {
+  width: 200px;
+}
+
+@media (width <= 767px) {
+  .scope-select {
+    width: 100%;
+  }
+
+  :deep(.el-date-editor--daterange) {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+}
+</style>

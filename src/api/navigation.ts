@@ -25,6 +25,10 @@ export type NavigationMenu = {
     | "sql-console"
     | "closet-users"
     | "closet-insights"
+    | "closet-dashboard"
+    | "closet-ops"
+    | "closet-exports"
+    | "closet-templates"
     | null;
   icon: string | null;
   sortOrder: number;

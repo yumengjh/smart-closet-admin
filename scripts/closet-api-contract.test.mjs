@@ -35,8 +35,24 @@ const insightRoutes = [
   ["getClosetOverview", "get", "/overview"],
   ["getClosetWardrobe", "get", "/wardrobe"],
   ["getClosetUsage", "get", "/usage"],
-  ["getClosetTrends", "get", "/trends"]
+  ["getClosetTrends", "get", "/trends"],
+  ["getClosetRecommendations", "get", "/recommendations"],
+  ["getClosetAi", "get", "/ai"]
 ];
 for (const [name, method, suffix] of insightRoutes) assertApi(insights, name, method, suffix, 'const root = "/closet/insights"');
 
-console.log("Closet API contract: 16 methods and paths match design 4.4.");
+const management = await readFile(new URL("../src/api/closet/management.ts", import.meta.url), "utf8");
+for (const [name, method, suffix] of [
+  ["getClosetOps", "get", "/ops/status"], ["getClosetTasks", "get", "/ops/tasks"],
+  ["getClosetOperationLog", "get", "/ops/operation-log"], ["getClosetDashboard", "get", "/dashboard/snapshot"],
+  ["getClosetDailyExport", "get", "/exports/daily"], ["downloadClosetDailyCsv", "get", "/exports/daily"],
+  ["getClosetEvents", "get", "/exports/events"], ["getClosetTemplates", "get", "/templates"],
+  ["reviewClosetTemplate", "patch", "/templates/${encodeURIComponent(id)}"]
+]) assertApi(management, name, method, suffix, 'const root = "/closet"');
+for (const key of ["closet-users", "closet-insights", "closet-dashboard", "closet-ops", "closet-exports", "closet-templates"]) {
+  for (const file of ["../src/router/utils.ts", "../src/api/routes.ts", "../src/api/navigation.ts", "../src/views/system/menu/index.vue"])
+    assert.ok((await readFile(new URL(file, import.meta.url), "utf8")).includes(key), `${key} missing from ${file}`);
+}
+assert.ok(management.includes('arrayFormat: "repeat"'), "multi-value parameters must use repeated query keys");
+assert.ok(management.includes('responseType: "blob"'), "CSV must download as a blob");
+console.log("Closet API contract: all 26 operations covered, plus CSV and 6 component keys.");

@@ -48,6 +48,13 @@ export const routeComponentRegistry: Record<
   "account-security": () => import("@/views/account/security/index.vue"),
   "gc-management": () => import("@/views/system/gc/index.vue"),
   "sql-console": () => import("@/views/system/sql-console/index.vue"),
+  "closet-dashboard": () =>
+    import("@/views/integrations/closet/dashboard/index.vue"),
+  "closet-ops": () => import("@/views/integrations/closet/ops/index.vue"),
+  "closet-exports": () =>
+    import("@/views/integrations/closet/exports/index.vue"),
+  "closet-templates": () =>
+    import("@/views/integrations/closet/templates/index.vue"),
   "closet-users": () => import("@/views/integrations/closet/users/index.vue"),
   "closet-insights": () =>
     import("@/views/integrations/closet/insights/index.vue")

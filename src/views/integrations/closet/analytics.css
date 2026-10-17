@@ -1,0 +1,125 @@
+.closet-analytics {
+  --analytics-blue: #3488e8;
+  --analytics-teal: #22a99a;
+  --analytics-amber: #e9a445;
+  --analytics-violet: #8a78d6;
+  color: var(--el-text-color-primary);
+}
+.closet-analytics .el-card {
+  border-radius: 12px;
+}
+.closet-analytics .el-card__header {
+  padding: 20px 22px 0;
+  border-bottom: 0;
+}
+.closet-analytics .el-card__body {
+  padding: 20px 22px;
+}
+.analytics-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+.analytics-title {
+  margin-right: auto;
+}
+.analytics-title h2 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+.analytics-title p,
+.chart-heading p {
+  margin-top: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+.analytics-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  border-radius: 12px;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.chart-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.chart-heading h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.analytics-note {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.analytics-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 16px 0;
+}
+.analytics-summary > div {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.analytics-summary strong {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.analytics-summary span {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+.analytics-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 24px;
+}
+.analytics-chart-grid > div {
+  min-width: 0;
+}
+.analytics-detail {
+  margin-top: 16px;
+}
+.analytics-detail .el-collapse-item__header {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+@media (max-width: 767px) {
+  .closet-analytics .el-card__body {
+    padding: 16px;
+  }
+  .closet-analytics .el-card__header {
+    padding: 16px 16px 0;
+  }
+  .analytics-title h2 {
+    font-size: 20px;
+  }
+  .analytics-title p,
+  .chart-heading p,
+  .analytics-note,
+  .analytics-summary span {
+    font-size: 14px;
+  }
+  .analytics-chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .analytics-summary {
+    gap: 16px;
+  }
+}
