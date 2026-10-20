@@ -18,6 +18,8 @@ export type NavigationRoute = {
     | "account-security"
     | "gc-management"
     | "sql-console"
+    | "closet-registration"
+    | "closet-account-events"
     | "closet-users"
     | "closet-insights"
     | "closet-dashboard"

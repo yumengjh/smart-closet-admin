@@ -359,6 +359,8 @@ onMounted(async () => {
               value="resume-management" /><el-option
               label="账户安全"
               value="account-security" />
+            <el-option label="注册与邀请" value="closet-registration" />
+            <el-option label="账号审计" value="closet-account-events" />
             <el-option label="鱼搭业务用户" value="closet-users" />
             <el-option label="衣柜洞察" value="closet-insights" />
             <el-option label="业务大屏" value="closet-dashboard" />

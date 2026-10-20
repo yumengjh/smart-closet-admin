@@ -23,6 +23,8 @@ const definitions = {
     "example:announcement:read": ["查看公告管理内容", "允许读取公告管理数据。"],
     "example:announcement:write": ["创建、编辑与发布公告", "允许维护和发布公告。"],
     "example:announcement:delete": ["删除公告", "允许删除公告。"],
+    "closet:registration:read": ["查看注册与邀请", "读取注册模式、邀请码及使用者。"],
+    "closet:registration:write": ["管理注册与邀请", "切换注册模式、创建、编辑及撤销邀请码。"],
     "closet:user:read": [
       "查看鱼搭业务用户",
       "读取鱼搭账号、会话、便携链接与额度。"
@@ -56,6 +58,8 @@ const definitions = {
     "announcement-management": ["公告管理", "公告管理页面组件。"],
     "resume-management": ["简历管理", "公开简历内容管理页面组件。"],
     "account-security": ["账户安全", "个人账户与会话安全页面组件。"],
+    "closet-registration": ["注册与邀请", "注册模式与邀请码管理。"],
+    "closet-account-events": ["账号审计", "鱼搭账号事件查询。"],
     "closet-users": ["鱼搭业务用户", "鱼搭业务账号管理。"],
     "closet-insights": ["衣柜洞察", "衣柜、推荐与 AI 用量。"],
     "closet-dashboard": ["业务大屏", "汇总业务趋势与分布。"],

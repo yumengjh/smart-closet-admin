@@ -64,6 +64,7 @@ declare global {
    * @see {@link https://pure-admin.cn/pages/config/#%E5%85%B7%E4%BD%93%E9%85%8D%E7%BD%AE}
    */
   interface ViteEnv {
+    VITE_CLOSET_PUBLIC_URL?: string;
     VITE_PORT: number;
     VITE_PUBLIC_PATH: string;
     VITE_ROUTER_HISTORY: string;
