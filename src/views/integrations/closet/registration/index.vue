@@ -14,8 +14,16 @@ import {
 import { isClosetServiceUnavailable } from "@/api/closet/errors";
 import { useCurrentPermissions } from "@/composables/useCurrentPermissions";
 import { message } from "@/utils/message";
-import { useClosetRequest, formatTime } from "../useClosetRequest";
-import { inviteStatusNames, registrationModeNames } from "../accountLabels";
+import { useClosetRequest } from "../useClosetRequest";
+import {
+  actorLabel,
+  dateTime,
+  inviteStatusNames,
+  inviteStatusTypes,
+  registrationModeHints,
+  registrationModeNames,
+  remainingText
+} from "../accountLabels";
 import ClosetUnavailable from "../ClosetUnavailable.vue";
 import InviteFormDialog from "./InviteFormDialog.vue";
 import InviteResultDialog from "./InviteResultDialog.vue";
@@ -26,7 +34,7 @@ const { loading, unavailable, errorMessage, run } = useClosetRequest();
 const state = ref<RegistrationState>();
 const mode = ref<RegistrationMode>("CLOSED");
 const rows = ref<Invite[]>([]);
-const status = ref<InviteStatus>();
+const status = ref<InviteStatus | "">("");
 const page = ref(1);
 const size = ref(20);
 const total = ref(0);
@@ -60,6 +68,13 @@ const load = () => {
 const search = () => {
   page.value = 1;
   void load();
+};
+const modes = Object.keys(registrationModeNames) as RegistrationMode[];
+const pick = (value: RegistrationMode) => {
+  if (!state.value || value === state.value.mode || saving.value) return;
+  if (!can("closet:registration:write")) return;
+  mode.value = value;
+  void changeMode();
 };
 const changeMode = async (restore = false) => {
   if (!can("closet:registration:write") || !state.value || saving.value) return;
@@ -109,7 +124,7 @@ const revoke = async (invite: Invite) => {
   saving.value = true;
   try {
     await ElMessageBox.confirm(
-      `撤销邀请码 ${invite.id}？撤销后无法继续使用，也无法编辑。已注册账号不受影响。`,
+      `撤销${invite.note ? `“${invite.note}”` : "这个邀请码"}？撤销后不能再用于注册，也无法编辑；已注册的账号不受影响。`,
       "撤销邀请码",
       {
         type: "warning",
@@ -132,18 +147,6 @@ onMounted(() => void load());
 </script>
 <template>
   <div class="page-root space-y-4">
-    <el-card shadow="never">
-      <div class="flex flex-wrap items-center gap-3">
-        <h2 class="mr-auto text-lg font-semibold">注册与邀请</h2>
-        <el-button
-          v-if="can('closet:registration:read')"
-          :loading="loading"
-          :disabled="saving"
-          @click="load"
-          >刷新</el-button
-        >
-      </div>
-    </el-card>
     <ClosetUnavailable v-if="unavailable" :loading="loading" @retry="load" />
     <el-alert
       v-else-if="errorMessage"
@@ -153,159 +156,216 @@ onMounted(() => void load());
       ><el-button link @click="load">重试</el-button></el-alert
     >
     <template v-else>
-      <el-card v-loading="loading" shadow="never">
-        <template #header>注册模式</template>
-        <template v-if="state">
-          <el-descriptions :column="1" border>
-            <el-descriptions-item label="当前生效"
-              ><el-tag>{{
-                registrationModeNames[state.mode]
-              }}</el-tag></el-descriptions-item
-            >
-            <el-descriptions-item label="部署默认">{{
-              registrationModeNames[state.configuredMode]
-            }}</el-descriptions-item>
-            <el-descriptions-item label="运行时覆盖">{{
-              state.overridden ? "已覆盖部署默认" : "使用部署默认"
-            }}</el-descriptions-item>
-            <el-descriptions-item label="修改人 / 时间"
-              >{{ state.updatedBy || "无" }} /
-              {{ formatTime(state.updatedAtMs) }}</el-descriptions-item
-            >
-            <el-descriptions-item label="可用邀请码">{{
-              state.activeInviteCount
-            }}</el-descriptions-item>
-          </el-descriptions>
-          <p class="my-3 text-sm">
-            关闭注册时不接受新注册；仅限邀请时须持有效邀请码；开放注册时用户可直接注册。
-          </p>
-          <div
-            v-if="can('closet:registration:write')"
-            class="flex flex-wrap items-center gap-3"
-          >
-            <el-select
-              v-model="mode"
-              class="!w-40"
-              aria-label="注册模式"
-              :disabled="saving || loading"
-              ><el-option
-                v-for="(label, value) in registrationModeNames"
-                :key="value"
-                :label="label"
-                :value="value"
-            /></el-select>
-            <el-button
-              type="primary"
-              :loading="saving"
-              :disabled="loading || mode === state.mode"
-              @click="changeMode()"
-              >切换模式</el-button
-            >
-            <el-button
-              :disabled="saving || loading || !state.overridden"
-              @click="changeMode(true)"
-              >恢复部署默认</el-button
+      <el-card v-loading="loading && !state" shadow="never">
+        <template #header>
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="mr-auto">
+              <h2 class="text-base font-semibold">注册方式</h2>
+              <p class="text-xs text-[var(--el-text-color-secondary)]">
+                决定鱼搭用户端能否自助注册，修改后立即生效。
+              </p>
+            </div>
+            <el-button :loading="loading" :disabled="saving" @click="load"
+              >刷新</el-button
             >
           </div>
         </template>
+        <template v-if="state">
+          <div class="modes" role="radiogroup" aria-label="注册方式">
+            <button
+              v-for="value in modes"
+              :key="value"
+              type="button"
+              role="radio"
+              class="mode"
+              :class="{ active: state.mode === value }"
+              :aria-checked="state.mode === value"
+              :disabled="saving || !can('closet:registration:write')"
+              @click="pick(value)"
+            >
+              <span class="mode-title">
+                {{ registrationModeNames[value] }}
+                <el-tag v-if="state.mode === value" size="small" type="primary"
+                  >当前</el-tag
+                >
+                <el-tag
+                  v-if="state.configuredMode === value"
+                  size="small"
+                  type="info"
+                  effect="plain"
+                  >部署默认</el-tag
+                >
+              </span>
+              <span class="mode-hint">{{ registrationModeHints[value] }}</span>
+            </button>
+          </div>
+          <div class="mode-footer">
+            <span v-if="state.overridden"
+              >已由 {{ actorLabel(state.updatedBy || "manage") }} 于
+              {{ dateTime(state.updatedAtMs) }} 覆盖部署默认（{{
+                registrationModeNames[state.configuredMode]
+              }}）。</span
+            >
+            <span v-else
+              >正在使用部署默认（环境变量 CLOSET_REGISTRATION）。</span
+            >
+            <el-button
+              v-if="state.overridden && can('closet:registration:write')"
+              link
+              type="primary"
+              :disabled="saving"
+              @click="changeMode(true)"
+              >恢复部署默认</el-button
+            >
+            <span class="ml-auto"
+              >可用邀请码 <b>{{ state.activeInviteCount }}</b> 个</span
+            >
+          </div>
+          <el-alert
+            v-if="state.mode === 'INVITE' && state.activeInviteCount === 0"
+            class="mt-3"
+            type="warning"
+            :closable="false"
+            show-icon
+            title="当前仅限邀请注册，但没有可用的邀请码，新用户暂时无法注册。"
+          />
+        </template>
       </el-card>
+
       <el-card shadow="never">
-        <template #header
-          ><div class="flex flex-wrap items-center gap-3">
-            <h3 class="mr-auto font-medium">邀请码</h3>
-            <el-select
+        <template #header>
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="mr-auto">
+              <h2 class="text-base font-semibold">邀请码</h2>
+              <p class="text-xs text-[var(--el-text-color-secondary)]">
+                共 {{ total }} 个；邀请码原文只在创建时显示一次。
+              </p>
+            </div>
+            <el-radio-group
               v-model="status"
-              class="!w-40"
-              placeholder="全部状态"
-              clearable
+              size="small"
               :disabled="saving"
               @change="search"
-              ><el-option
+            >
+              <el-radio-button value="">全部</el-radio-button>
+              <el-radio-button
                 v-for="(label, value) in inviteStatusNames"
                 :key="value"
-                :label="label"
-                :value="value" /></el-select
-            ><el-button
+                :value="value"
+                >{{ label }}</el-radio-button
+              >
+            </el-radio-group>
+            <el-button
               v-if="can('closet:registration:write')"
               type="primary"
               :disabled="saving || loading"
               @click="edit()"
               >创建邀请码</el-button
             >
-          </div></template
-        >
+          </div>
+        </template>
         <el-table
           v-loading="loading"
           :data="rows"
           row-key="id"
-          empty-text="暂无邀请码"
+          class="clickable-rows"
+          :empty-text="status ? '没有该状态的邀请码' : '还没有邀请码'"
+          @row-click="showDetail"
         >
+          <el-table-column label="邀请码" min-width="200">
+            <template #default="{ row }">
+              <div class="truncate font-medium">
+                {{ row.note || "未填写备注" }}
+              </div>
+              <div
+                class="font-mono text-xs text-[var(--el-text-color-secondary)]"
+              >
+                {{ row.id.slice(0, 8) }}
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }"
+              ><el-tag
+                :type="
+                  inviteStatusTypes[
+                    row.status as keyof typeof inviteStatusTypes
+                  ] ?? 'info'
+                "
+                effect="plain"
+                >{{
+                  inviteStatusNames[
+                    row.status as keyof typeof inviteStatusNames
+                  ] ?? row.status
+                }}</el-tag
+              ></template
+            >
+          </el-table-column>
+          <el-table-column label="使用情况" min-width="140">
+            <template #default="{ row }">
+              <div class="usage">
+                <el-progress
+                  :percentage="Math.round((row.usedCount / row.maxUses) * 100)"
+                  :show-text="false"
+                  :stroke-width="6"
+                  class="flex-1"
+                />
+                <span class="tabular-nums"
+                  >{{ row.usedCount }}/{{ row.maxUses }}</span
+                >
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="到期" min-width="150">
+            <template #default="{ row }">
+              <div>{{ dateTime(row.expiresAtMs) }}</div>
+              <div
+                v-if="row.status === 'ACTIVE'"
+                class="text-xs text-[var(--el-text-color-secondary)]"
+              >
+                {{ remainingText(row.expiresAtMs) }}
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="创建" min-width="150">
+            <template #default="{ row }">
+              <div class="truncate">{{ actorLabel(row.createdBy) }}</div>
+              <div class="text-xs text-[var(--el-text-color-secondary)]">
+                {{ dateTime(row.createdAtMs) }}
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column
-            prop="id"
-            label="邀请码 ID"
-            min-width="200"
-            show-overflow-tooltip
-          />
-          <el-table-column
-            prop="note"
-            label="备注"
-            min-width="180"
-            show-overflow-tooltip
-          />
-          <el-table-column label="状态" width="110"
-            ><template #default="{ row }"
-              ><el-tag :type="row.status === 'ACTIVE' ? 'success' : 'info'">{{
-                inviteStatusNames[row.status] ?? row.status
-              }}</el-tag></template
-            ></el-table-column
+            v-if="can('closet:registration:write')"
+            label=""
+            width="110"
+            fixed="right"
+            align="right"
           >
-          <el-table-column label="已用 / 名额" width="110"
-            ><template #default="{ row }"
-              >{{ row.usedCount }} / {{ row.maxUses }}</template
-            ></el-table-column
-          >
-          <el-table-column label="到期时间" min-width="180"
-            ><template #default="{ row }">{{
-              formatTime(row.expiresAtMs)
-            }}</template></el-table-column
-          >
-          <el-table-column
-            prop="createdBy"
-            label="创建者"
-            min-width="140"
-            show-overflow-tooltip
-          />
-          <el-table-column label="创建时间" min-width="180"
-            ><template #default="{ row }">{{
-              formatTime(row.createdAtMs)
-            }}</template></el-table-column
-          >
-          <el-table-column label="操作" fixed="right" width="180"
-            ><template #default="{ row }"
-              ><el-button link type="primary" @click="showDetail(row)"
-                >详情</el-button
-              ><template v-if="can('closet:registration:write')"
+            <template #default="{ row }"
+              ><template v-if="row.status !== 'REVOKED'"
                 ><el-button
                   link
                   type="primary"
-                  :disabled="saving || loading || row.status === 'REVOKED'"
-                  @click="edit(row)"
+                  :disabled="saving || loading"
+                  @click.stop="edit(row)"
                   >编辑</el-button
                 ><el-button
                   link
                   type="danger"
-                  :disabled="saving || loading || row.status === 'REVOKED'"
-                  @click="revoke(row)"
+                  :disabled="saving || loading"
+                  @click.stop="revoke(row)"
                   >撤销</el-button
                 ></template
               ></template
-            ></el-table-column
-          >
+            >
+          </el-table-column>
         </el-table>
-        <div class="mt-4 overflow-x-auto">
+        <div class="mt-4 flex justify-end">
           <el-pagination
             v-model:current-page="page"
             v-model:page-size="size"
+            background
             :total="total"
             :page-sizes="[20, 50, 100]"
             layout="total, sizes, prev, pager, next"
@@ -327,3 +387,83 @@ onMounted(() => void load());
     <InviteDetailDrawer :id="detailId" v-model="detailOpen" />
   </div>
 </template>
+
+<style scoped>
+.modes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (width <= 760px) {
+  .modes {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mode {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.mode:hover:not(:disabled) {
+  border-color: var(--el-color-primary-light-5);
+}
+
+.mode:disabled {
+  cursor: not-allowed;
+}
+
+.mode.active {
+  background: var(--el-color-primary-light-9);
+  border-color: var(--el-color-primary);
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+}
+
+.mode-title {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.mode-hint {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.mode-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.mode-footer b {
+  color: var(--el-text-color-primary);
+}
+
+.usage {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.clickable-rows :deep(.el-table__row) {
+  cursor: pointer;
+}
+</style>

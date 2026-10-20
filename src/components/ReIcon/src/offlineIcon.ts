@@ -27,6 +27,7 @@ import RiDownload2Line from "~icons/ri/download-2-line?raw";
 import RiCheckboxMultipleLine from "~icons/ri/checkbox-multiple-line?raw";
 import RiGroupLine from "~icons/ri/group-line?raw";
 import RiSearchLine from "~icons/ri/search-line?raw";
+import RiCoupon3Line from "~icons/ri/coupon-3-line?raw";
 
 // 后端菜单的 icon 字段使用这里注册的 key（如 ri/pulse-line），新增菜单图标需在此补充
 const icons = [
@@ -53,7 +54,8 @@ const icons = [
   ["ri/download-2-line", RiDownload2Line],
   ["ri/checkbox-multiple-line", RiCheckboxMultipleLine],
   ["ri/group-line", RiGroupLine],
-  ["ri/search-line", RiSearchLine]
+  ["ri/search-line", RiSearchLine],
+  ["ri/coupon-3-line", RiCoupon3Line]
 ];
 
 icons.forEach(([name, icon]) => {

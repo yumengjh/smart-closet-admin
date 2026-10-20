@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import type { FormInstance } from "element-plus";
 import {
   createClosetInvite,
@@ -101,6 +101,12 @@ const save = async () => {
     saving.value = false;
   }
 };
+const expiryPreview = computed(() => {
+  const days = Number(form.expiresInDays) || 0;
+  if (!days) return "";
+  const date = new Date(Date.now() + days * 86_400_000);
+  return `到 ${date.getMonth() + 1} 月 ${date.getDate()} 日失效`;
+});
 </script>
 <template>
   <el-dialog
@@ -120,7 +126,11 @@ const save = async () => {
       @submit.prevent="save"
     >
       <el-form-item label="备注"
-        ><el-input v-model="form.note" maxlength="100" show-word-limit
+        ><el-input
+          v-model="form.note"
+          maxlength="100"
+          show-word-limit
+          placeholder="例如：发给谁、哪个渠道，便于之后辨认"
       /></el-form-item>
       <el-form-item label="注册名额" prop="maxUses"
         ><el-input-number
@@ -128,14 +138,20 @@ const save = async () => {
           :min="Math.max(1, invite?.usedCount ?? 0)"
           :max="100"
           :precision="0"
-      /></el-form-item>
+        /><span class="field-hint">{{
+          invite
+            ? `已使用 ${invite.usedCount} 次，名额不能低于已使用次数`
+            : "可以注册的账号数量"
+        }}</span></el-form-item
+      >
       <el-form-item v-if="!invite" label="有效天数" prop="expiresInDays"
         ><el-input-number
           v-model="form.expiresInDays"
           :min="1"
           :max="90"
           :precision="0"
-      /></el-form-item>
+        /><span class="field-hint">{{ expiryPreview }}</span></el-form-item
+      >
       <el-form-item v-else label="到期时间" prop="expiresAtMs"
         ><el-date-picker
           v-model="form.expiresAtMs"
@@ -143,7 +159,13 @@ const save = async () => {
           value-format="x"
           class="!w-full"
           :clearable="false"
-      /></el-form-item>
+          :disabled-date="
+            (date: Date) =>
+              date.getTime() < Date.now() - 86_400_000 ||
+              date.getTime() > Date.now() + 90 * 86_400_000
+          "
+        /><span class="field-hint">最长为现在起 90 天</span></el-form-item
+      >
     </el-form>
     <template #footer
       ><el-button :disabled="saving" @click="emit('update:modelValue', false)"
@@ -154,3 +176,11 @@ const save = async () => {
     >
   </el-dialog>
 </template>
+
+<style scoped>
+.field-hint {
+  margin-left: 12px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+</style>
