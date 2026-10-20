@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useCurrentPermissions } from "@/composables/useCurrentPermissions";
 import { createClosetUser, type ClosetRole } from "@/api/closet/users";
 import { isClosetServiceUnavailable } from "@/api/closet/errors";
 import { message } from "@/utils/message";
@@ -10,11 +11,15 @@ const emit = defineEmits<{
   created: [result: { username: string; temporaryPassword: string | null }];
   unavailable: [];
 }>();
+const { can } = useCurrentPermissions();
 const formRef = ref();
 const submitting = ref(false);
-const form = reactive<{ username: string; role: ClosetRole; password: string }>(
-  { username: "", role: "USER", password: "" }
-);
+const form = reactive<{
+  username: string;
+  displayName: string;
+  role: ClosetRole;
+  password: string;
+}>({ username: "", displayName: "", role: "USER", password: "" });
 const rules = {
   username: [
     { required: true, message: "请输入用户名", trigger: "blur" },
@@ -31,24 +36,34 @@ const rules = {
 watch(
   () => props.modelValue,
   open => {
-    if (open) Object.assign(form, { username: "", role: "USER", password: "" });
+    if (open)
+      Object.assign(form, {
+        username: "",
+        displayName: "",
+        role: "USER",
+        password: ""
+      });
   }
 );
 const submit = async () => {
+  if (!can("closet:user:write") || submitting.value) return;
   if (!(await formRef.value?.validate().catch(() => false))) return;
   submitting.value = true;
   try {
     const { data } = await createClosetUser({
       username: form.username.trim(),
       role: form.role,
+      displayName: form.displayName.trim() || undefined,
       password: form.password || null
     });
     emit("created", data);
     emit("update:modelValue", false);
     message("业务用户已创建", { type: "success" });
   } catch (error) {
-    if (isClosetServiceUnavailable(error)) emit("unavailable");
-    else message("创建用户失败，请检查用户名和输入内容", { type: "error" });
+    if (isClosetServiceUnavailable(error)) {
+      emit("unavailable");
+      emit("update:modelValue", false);
+    } else message("创建用户失败，请检查用户名和输入内容", { type: "error" });
   } finally {
     submitting.value = false;
   }
@@ -59,13 +74,23 @@ const submit = async () => {
   <el-dialog
     :model-value="modelValue"
     title="创建业务用户"
-    width="500px"
-    @update:model-value="emit('update:modelValue', $event)"
+    width="min(500px, 94vw)"
+    :close-on-click-modal="false"
+    :close-on-press-escape="!submitting"
+    :show-close="!submitting"
+    @update:model-value="!submitting && emit('update:modelValue', $event)"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="104px">
       <el-form-item label="用户名" prop="username">
         <el-input v-model="form.username" autocomplete="off" maxlength="80" />
       </el-form-item>
+      <el-form-item label="昵称"
+        ><el-input
+          v-model="form.displayName"
+          maxlength="40"
+          show-word-limit
+          placeholder="可选，最多 40 个字符"
+      /></el-form-item>
       <el-form-item label="角色" prop="role">
         <el-select v-model="form.role" class="w-full">
           <el-option label="普通用户" value="USER" />
@@ -83,7 +108,11 @@ const submit = async () => {
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="emit('update:modelValue', false)">取消</el-button>
+      <el-button
+        :disabled="submitting"
+        @click="emit('update:modelValue', false)"
+        >取消</el-button
+      >
       <el-button type="primary" :loading="submitting" @click="submit"
         >创建用户</el-button
       >

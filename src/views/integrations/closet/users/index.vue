@@ -1,28 +1,31 @@
 <script setup lang="ts">
 import {
   listClosetUsers,
+  type ClosetUserQuery,
+  type RegisteredVia,
   type ClosetRole,
   type ClosetUserStatus,
   type ClosetUserSummary
 } from "@/api/closet/users";
-import { isClosetServiceUnavailable } from "@/api/closet/errors";
+import { useClosetRequest } from "../useClosetRequest";
 import { useCurrentPermissions } from "@/composables/useCurrentPermissions";
 import ClosetUnavailable from "../ClosetUnavailable.vue";
 import CreateUserDialog from "./CreateUserDialog.vue";
 import TemporaryPasswordDialog from "./TemporaryPasswordDialog.vue";
 import UserDetailDrawer from "./UserDetailDrawer.vue";
-import { message } from "@/utils/message";
 import { onMounted, ref } from "vue";
+import { registeredViaNames } from "../accountLabels";
 
 defineOptions({ name: "ClosetUserManagement" });
 const { can } = useCurrentPermissions();
-const loading = ref(false);
-const unavailable = ref(false);
+const { loading, unavailable, errorMessage, run } = useClosetRequest();
 const rows = ref<ClosetUserSummary[]>([]);
 const query = ref("");
 const status = ref<ClosetUserStatus>();
 const role = ref<ClosetRole>();
-const sort = ref<"createdAt" | "username" | "lastActiveAt">("createdAt");
+const registeredVia = ref<RegisteredVia>();
+const deactivated = ref<boolean>();
+const sort = ref<ClosetUserQuery["sort"]>("createdAt");
 const order = ref<"asc" | "desc">("desc");
 const page = ref(0);
 const size = ref(20);
@@ -35,26 +38,28 @@ const temporaryPassword = ref("");
 const dateText = (value?: number | null) =>
   value ? new Date(value).toLocaleString() : "暂无";
 const load = async () => {
-  loading.value = true;
-  unavailable.value = false;
-  try {
-    const { data } = await listClosetUsers({
-      q: query.value.trim() || undefined,
-      status: status.value,
-      role: role.value,
-      sort: sort.value,
-      order: order.value,
-      page: page.value,
-      size: size.value
-    });
-    rows.value = data.items;
-    total.value = data.totalElements;
-  } catch (error) {
-    if (isClosetServiceUnavailable(error)) unavailable.value = true;
-    else message("读取业务用户失败", { type: "error" });
-  } finally {
-    loading.value = false;
-  }
+  if (!can("closet:user:read")) return;
+  return run(
+    () =>
+      listClosetUsers({
+        q: query.value.trim() || undefined,
+        status: status.value || undefined,
+        role: role.value || undefined,
+        registeredVia: registeredVia.value || undefined,
+        deactivated:
+          typeof deactivated.value === "boolean"
+            ? deactivated.value
+            : undefined,
+        sort: sort.value,
+        order: order.value,
+        page: page.value,
+        size: size.value
+      }),
+    ({ data }) => {
+      rows.value = data.items;
+      total.value = data.totalElements;
+    }
+  );
 };
 const search = () => {
   page.value = 0;
@@ -70,7 +75,8 @@ const onSortChange = ({
   const sortMap: Record<string, typeof sort.value> = {
     createdAtMs: "createdAt",
     username: "username",
-    lastActiveAtMs: "lastActiveAt"
+    lastActiveAtMs: "lastActiveAt",
+    lastLoginAtMs: "lastLoginAt"
   };
   if (!prop || !direction || !sortMap[prop]) {
     sort.value = "createdAt";
@@ -83,6 +89,7 @@ const onSortChange = ({
   void load();
 };
 const openDetail = (row: ClosetUserSummary) => {
+  if (!can("closet:user:read")) return;
   selected.value = row;
   detailOpen.value = true;
 };
@@ -139,13 +146,51 @@ onMounted(load);
               value="ADMIN"
             />
           </el-select>
-          <el-button type="primary" @click="search">查询</el-button>
+          <el-select
+            v-model="registeredVia"
+            class="!w-36"
+            clearable
+            placeholder="注册来源"
+            @change="search"
+          >
+            <el-option
+              v-for="(label, value) in registeredViaNames"
+              :key="value"
+              :label="label"
+              :value="value"
+            />
+          </el-select>
+          <el-select
+            v-model="deactivated"
+            class="!w-36"
+            clearable
+            placeholder="注销状态"
+            @change="search"
+          >
+            <el-option label="未注销" :value="false" /><el-option
+              label="已注销"
+              :value="true"
+            />
+          </el-select>
+          <el-button
+            v-if="can('closet:user:read')"
+            type="primary"
+            @click="search"
+            >查询</el-button
+          >
           <el-button v-if="can('closet:user:write')" @click="createOpen = true"
             >创建用户</el-button
           >
         </div>
       </template>
       <ClosetUnavailable v-if="unavailable" :loading="loading" @retry="load" />
+      <el-alert
+        v-else-if="errorMessage"
+        :title="errorMessage"
+        type="error"
+        :closable="false"
+        ><el-button link @click="load">重试</el-button></el-alert
+      >
       <template v-else>
         <el-table
           v-loading="loading"
@@ -160,6 +205,28 @@ onMounted(load);
             min-width="150"
             sortable="custom"
           />
+          <el-table-column
+            prop="displayName"
+            label="昵称"
+            min-width="140"
+            show-overflow-tooltip
+          />
+          <el-table-column label="注册来源" min-width="130"
+            ><template #default="{ row }">{{
+              registeredViaNames[row.registeredVia] ??
+              row.registeredVia ??
+              "暂无"
+            }}</template></el-table-column
+          >
+          <el-table-column
+            prop="lastLoginAtMs"
+            label="最近登录"
+            min-width="180"
+            sortable="custom"
+            ><template #default="{ row }">{{
+              dateText(row.lastLoginAtMs)
+            }}</template></el-table-column
+          >
           <el-table-column label="角色" width="120"
             ><template #default="{ row }">{{
               row.role === "ADMIN" ? "管理员" : "普通用户"
@@ -167,7 +234,8 @@ onMounted(load);
           >
           <el-table-column label="状态" width="110"
             ><template #default="{ row }"
-              ><el-tag :type="row.enabled ? 'success' : 'info'">{{
+              ><el-tag v-if="row.deactivatedAtMs" type="danger">已注销</el-tag
+              ><el-tag v-else :type="row.enabled ? 'success' : 'info'">{{
                 row.enabled ? "已启用" : "已禁用"
               }}</el-tag></template
             ></el-table-column

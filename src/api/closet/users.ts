@@ -3,7 +3,24 @@ import type { ApiResponse } from "../user";
 
 export type ClosetRole = "USER" | "ADMIN";
 export type ClosetUserStatus = "ENABLED" | "DISABLED";
+export type RegisteredVia = "ADMIN" | "INVITE" | "OPEN";
+export type LoginLock = {
+  locked: boolean;
+  recentFailures: number;
+  retryAfterSeconds: number;
+};
+export type AccountEvent = {
+  occurredAtMs: number;
+  actor: string;
+  action: string;
+  detail: string | null;
+};
+export type AccountAuditEvent = AccountEvent & { id: string; username: string };
 export type ClosetUserSummary = {
+  displayName: string | null;
+  registeredVia: RegisteredVia;
+  lastLoginAtMs: number | null;
+  deactivatedAtMs: number | null;
   username: string;
   role: ClosetRole;
   enabled: boolean;
@@ -15,6 +32,8 @@ export type ClosetUserSummary = {
   outfitCount: number;
 };
 export type ClosetUserDetail = ClosetUserSummary & {
+  inviteId: string | null;
+  loginLock: LoginLock;
   garments: Record<string, number>;
   outfitPlanCount: number;
   quickIntakeCount: number;
@@ -33,7 +52,9 @@ export type ClosetUserQuery = {
   q?: string;
   status?: ClosetUserStatus;
   role?: ClosetRole;
-  sort?: "createdAt" | "username" | "lastActiveAt";
+  registeredVia?: RegisteredVia;
+  deactivated?: boolean;
+  sort?: "createdAt" | "username" | "lastActiveAt" | "lastLoginAt";
   order?: "asc" | "desc";
   page: number;
   size: number;
@@ -79,6 +100,7 @@ export const getClosetUser = (username: string) =>
   );
 export const createClosetUser = (data: {
   username: string;
+  displayName?: string;
   role: ClosetRole;
   password: string | null;
 }) => http.request<ApiResponse<CredentialResult>>("post", root, { data });
@@ -136,4 +158,48 @@ export const updateClosetUserQuota = (
     "put",
     `${root}/${encodeURIComponent(username)}/quota`,
     { data }
+  );
+
+export const updateClosetUserProfile = (
+  username: string,
+  displayName: string
+) =>
+  http.request<ApiResponse<{ username: string; displayName: string | null }>>(
+    "patch",
+    `${root}/${encodeURIComponent(username)}/profile`,
+    { data: { displayName } }
+  );
+export const revokeClosetUserSession = (username: string, sessionRef: string) =>
+  http.request<void>(
+    "delete",
+    `${root}/${encodeURIComponent(username)}/sessions/${encodeURIComponent(sessionRef)}`
+  );
+export const getClosetUserLoginLock = (username: string) =>
+  http.request<ApiResponse<LoginLock>>(
+    "get",
+    `${root}/${encodeURIComponent(username)}/login-lock`
+  );
+export const clearClosetUserLoginLock = (username: string) =>
+  http.request<ApiResponse<LoginLock>>(
+    "delete",
+    `${root}/${encodeURIComponent(username)}/login-lock`
+  );
+export const getClosetUserEvents = (username: string) =>
+  http.request<ApiResponse<AccountEvent[]>>(
+    "get",
+    `${root}/${encodeURIComponent(username)}/events`
+  );
+export const listClosetAccountEvents = (params: {
+  from?: string;
+  to?: string;
+  username?: string;
+  action?: string;
+  actor?: string;
+  page: number;
+  size: number;
+}) =>
+  http.request<ApiResponse<ClosetPage<AccountAuditEvent>>>(
+    "get",
+    "/closet/account-events",
+    { params }
   );
