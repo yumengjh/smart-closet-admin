@@ -136,7 +136,8 @@ export function trendOption(
       itemGap: 16,
       textStyle: { color: t.text, fontSize: 12 }
     },
-    grid: { left: 4, right: 10, top: 30, bottom: 2, containLabel: true },
+    // Room on the right for the ripple on the latest point.
+    grid: { left: 4, right: 18, top: 30, bottom: 2, containLabel: true },
     xAxis: {
       type: "category",
       boundaryGap: false,
@@ -344,109 +345,13 @@ export function roseOption(
   };
 }
 
-export function gaugeOption(
-  theme: ScreenTheme,
-  rate: number | null | undefined
-): EChartsOption {
-  const t = tones[theme];
-  const value = rate == null ? 0 : +(rate * 100).toFixed(1);
-  return {
-    series: [
-      {
-        type: "gauge",
-        startAngle: 210,
-        endAngle: -30,
-        radius: "100%",
-        center: ["50%", "62%"],
-        min: 0,
-        max: 100,
-        progress: {
-          show: true,
-          width: 12,
-          roundCap: true,
-          itemStyle: {
-            color: {
-              type: "linear",
-              x: 0,
-              y: 0,
-              x2: 1,
-              y2: 0,
-              colorStops: [
-                { offset: 0, color: t.series[1] },
-                { offset: 1, color: t.series[0] }
-              ]
-            },
-            shadowBlur: t.glow ? 12 : 0,
-            shadowColor: hexAlpha(t.series[0], 0.6)
-          }
-        },
-        axisLine: {
-          roundCap: true,
-          lineStyle: { width: 12, color: [[1, t.track]] }
-        },
-        axisTick: { show: false },
-        splitLine: { show: false },
-        axisLabel: { show: false },
-        pointer: { show: false },
-        anchor: { show: false },
-        title: { offsetCenter: [0, "42%"], color: t.sub, fontSize: 12 },
-        detail: {
-          offsetCenter: [0, "4%"],
-          valueAnimation: true,
-          formatter: rate == null ? "—" : "{value}%",
-          color: t.strong,
-          fontSize: 26,
-          fontWeight: 600
-        },
-        data: [{ value, name: "七日采用率" }]
-      }
-    ]
-  };
-}
-
-export function sourceOption(
-  theme: ScreenTheme,
-  rows: { name: string; shown: number; adopted: number }[]
-): EChartsOption {
-  const t = tones[theme];
-  return {
-    color: [t.series[1], t.series[0]],
-    tooltip: {
-      ...tooltipOf(t),
-      trigger: "axis",
-      axisPointer: { type: "shadow" }
-    },
-    legend: {
-      top: 0,
-      right: 0,
-      icon: "circle",
-      itemWidth: 8,
-      itemHeight: 8,
-      textStyle: { color: t.text, fontSize: 12 }
-    },
-    grid: { left: 2, right: 28, top: 22, bottom: 2, containLabel: true },
-    xAxis: { type: "value", show: false },
-    yAxis: {
-      type: "category",
-      inverse: true,
-      data: rows.map(row => row.name),
-      axisTick: { show: false },
-      axisLine: { show: false },
-      axisLabel: { color: t.text, fontSize: 12 }
-    },
-    series: [
-      { key: "shown", name: "展示" },
-      { key: "adopted", name: "采用" }
-    ].map(({ key, name }) => ({
-      name,
-      type: "bar",
-      barWidth: 8,
-      itemStyle: { borderRadius: 4 },
-      label: { show: true, position: "right", color: t.text, fontSize: 11 },
-      data: rows.map(row => row[key as "shown" | "adopted"])
-    }))
-  };
-}
+/** 300000 → 30万, 1500 → 1.5k: keeps value axes narrow. */
+const compact = (value: number) =>
+  value >= 10000
+    ? `${+(value / 10000).toFixed(1)}万`
+    : value >= 1000
+      ? `${+(value / 1000).toFixed(1)}k`
+      : `${value}`;
 
 export function columnOption(
   theme: ScreenTheme,
@@ -467,7 +372,8 @@ export function columnOption(
     },
     yAxis: {
       type: "value",
-      axisLabel: { color: t.sub, fontSize: 11 },
+      splitNumber: 3,
+      axisLabel: { color: t.sub, fontSize: 11, formatter: compact },
       splitLine: { lineStyle: { color: t.line, type: "dashed" } }
     },
     series: [
@@ -493,7 +399,8 @@ export function sparkOption(
   const t = tones[theme];
   const color = t.series[index % t.series.length];
   return {
-    grid: { left: 0, right: 0, top: 4, bottom: 2 },
+    // Inset so the ripple on the last point is not clipped by the chart edge.
+    grid: { left: 2, right: 14, top: 12, bottom: 4 },
     xAxis: {
       type: "category",
       show: false,

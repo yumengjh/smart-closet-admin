@@ -23,10 +23,8 @@ import ScreenControls from "./ScreenControls.vue";
 import {
   barOption,
   columnOption,
-  gaugeOption,
   ringOption,
   roseOption,
-  sourceOption,
   sparkOption,
   seriesColors,
   trendOption,
@@ -204,14 +202,24 @@ const seasons = computed(() =>
 const sourceRows = computed(
   () => snapshot.value?.distributions.recommendationSources7d ?? []
 );
-const sources = computed(() =>
-  sourceOption(
-    theme.value,
-    sourceRows.value.map(item => ({
-      name: sourceLabel(item.source),
-      shown: item.shown,
-      adopted: item.adopted
-    }))
+// Each source is one row: the track is scaled to the busiest source, the inner bar is what got adopted.
+const sources = computed(() => {
+  const max = Math.max(1, ...sourceRows.value.map(item => item.shown));
+  return sourceRows.value.map(item => ({
+    name: sourceLabel(item.source),
+    shown: item.shown,
+    adopted: item.adopted,
+    shownWidth: (item.shown / max) * 100,
+    adoptedWidth: item.shown ? (item.adopted / item.shown) * 100 : 0
+  }));
+});
+const adoptionTotals = computed(() =>
+  sourceRows.value.reduce(
+    (sum, item) => ({
+      shown: sum.shown + item.shown,
+      adopted: sum.adopted + item.adopted
+    }),
+    { shown: 0, adopted: 0 }
   )
 );
 const trendCount = computed(() =>
@@ -229,7 +237,6 @@ const seasonCount = computed(
     snapshot.value?.distributions.seasons.filter(item => item.count > 0)
       .length ?? 0
 );
-const gauge = computed(() => gaugeOption(theme.value, tile("adoptionRate7d")));
 const tokens = computed(() =>
   columnOption(
     theme.value,
@@ -256,10 +263,10 @@ const layers = computed(() => {
   }));
 });
 const usage = computed(() => [
-  { label: "今日打卡", value: tile("wearLogsToday") },
+  { label: "打卡", value: tile("wearLogsToday") },
   { label: "助手消息", value: tile("agentMessagesToday") },
   { label: "图片用量", value: tile("imageUnitsToday") },
-  { label: "今日 Token", value: tile("modelTokensToday") }
+  { label: "Token", value: tile("modelTokensToday") }
 ]);
 const healthy = computed(() => snapshot.value?.ops.status === "UP");
 const fullscreen = async () => {
@@ -359,17 +366,49 @@ const fullscreen = async () => {
       </div>
       <div class="panel p-adoption">
         <h3>推荐采用 · 近 7 天</h3>
-        <div class="gauge">
-          <ScreenChart :option="gauge" :replay="replay" />
+        <div class="adoption-head">
+          <div class="adoption-rate">
+            <strong
+              ><CountUp
+                :value="tile('adoptionRate7d')"
+                percent
+                :replay="replay"
+            /></strong>
+            <span class="adoption-label">七日采用率</span>
+          </div>
+          <dl class="adoption-totals">
+            <div>
+              <dt><i class="swatch shown" />展示</dt>
+              <dd>{{ adoptionTotals.shown.toLocaleString() }}</dd>
+            </div>
+            <div>
+              <dt><i class="swatch adopted" />采用</dt>
+              <dd>{{ adoptionTotals.adopted.toLocaleString() }}</dd>
+            </div>
+          </dl>
         </div>
-        <div class="body">
-          <ScreenChart
-            v-if="sourceRows.length"
-            :option="sources"
-            :replay="replay"
-          />
-          <p v-else class="empty">过去七天暂无推荐记录</p>
-        </div>
+        <ul v-if="sources.length" class="sources">
+          <li v-for="item in sources" :key="item.name">
+            <span class="source-name" :title="item.name"
+              >{{ item.name
+              }}<small>{{
+                item.shown
+                  ? `${((item.adopted / item.shown) * 100).toFixed(1)}%`
+                  : "—"
+              }}</small></span
+            >
+            <span class="source-track"
+              ><span
+                class="source-shown"
+                :style="{ width: `${item.shownWidth}%` }"
+                ><i :style="{ width: `${item.adoptedWidth}%` }" /></span
+            ></span>
+            <span class="source-count"
+              ><b>{{ item.adopted }}</b> / {{ item.shown }}</span
+            >
+          </li>
+        </ul>
+        <p v-else class="empty">过去七天暂无推荐记录</p>
       </div>
 
       <div class="panel p-colors">
@@ -479,7 +518,9 @@ const fullscreen = async () => {
     animation: none;
   }
 
-  .layer-track i {
+  .layer-track i,
+  .source-shown,
+  .source-shown i {
     transition: none;
   }
 }
@@ -669,9 +710,136 @@ const fullscreen = async () => {
   grid-column: span 3;
 }
 
-.gauge {
-  flex: 0 0 46%;
+.adoption-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 6px 0 14px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--screen-chip);
+}
+
+.adoption-rate {
+  display: flex;
+  flex-direction: column;
+}
+
+.adoption-rate strong {
+  font-size: 34px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--screen-strong);
+  text-shadow: var(--screen-glow);
+}
+
+.adoption-label {
+  font-size: 12px;
+  color: var(--screen-sub);
+}
+
+.adoption-totals {
+  display: flex;
+  gap: 16px;
+}
+
+.adoption-totals dt {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--screen-sub);
+}
+
+.adoption-totals dd {
+  font-size: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--screen-strong);
+  text-align: right;
+}
+
+.swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.swatch.shown,
+.source-shown {
+  background: color-mix(in srgb, var(--screen-accent) 22%, transparent);
+}
+
+.swatch.adopted,
+.source-shown i {
+  background: var(--screen-accent);
+}
+
+.sources {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: space-around;
   min-height: 0;
+  overflow: hidden;
+}
+
+.sources li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.source-name {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--screen-text);
+  white-space: nowrap;
+}
+
+.source-name small {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--screen-sub);
+}
+
+.source-track {
+  height: 8px;
+  overflow: hidden;
+  background: var(--screen-chip);
+  border-radius: 4px;
+}
+
+.source-shown {
+  display: block;
+  min-width: 4px;
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.9s ease;
+}
+
+.source-shown i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.9s ease;
+}
+
+.source-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--screen-sub);
+  white-space: nowrap;
+}
+
+.source-count b {
+  font-weight: 500;
+  color: var(--screen-strong);
 }
 
 .p-colors,
@@ -742,26 +910,31 @@ const fullscreen = async () => {
 
 .chips {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 4px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .chips div {
-  padding: 6px 8px;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 5px 10px;
   background: var(--screen-chip);
   border-radius: 8px;
 }
 
 .chips span {
-  display: block;
-  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
   color: var(--screen-sub);
   white-space: nowrap;
 }
 
 .chips b {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--screen-strong);
