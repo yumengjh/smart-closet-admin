@@ -536,7 +536,6 @@ const fullscreen = async () => {
 
   .kpi-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    row-gap: 18px;
   }
 
   .panel {
@@ -548,9 +547,10 @@ const fullscreen = async () => {
   }
 }
 
+/* Cards sit directly on the layout's page background; the screen itself has none. */
 .screen {
-  --screen-bg: #fff;
-  --screen-panel: #f5f6f8;
+  --screen-bg: var(--el-bg-color-page);
+  --screen-panel: #fff;
   --screen-strong: #111827;
   --screen-text: #4b5563;
   --screen-sub: #9ca3af;
@@ -571,12 +571,12 @@ const fullscreen = async () => {
   padding: 4px 0;
   overflow: hidden;
   color: var(--screen-text);
-  background: var(--screen-bg);
 }
 
 .screen:fullscreen {
   height: 100vh !important;
   padding: 20px;
+  background: var(--screen-bg);
 }
 
 .panel {
@@ -623,17 +623,25 @@ const fullscreen = async () => {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr)) 34px;
   grid-column: 1 / -1;
-  gap: 24px;
+  gap: 14px;
+  align-items: stretch;
   min-height: 0;
-  padding: 0 4px;
+}
+
+.kpi-row > :last-child {
+  align-self: start;
 }
 
 .kpi {
   display: flex;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
   min-width: 0;
+  padding: 10px 16px;
   overflow: hidden;
+  background: var(--screen-panel);
+  border-radius: 12px;
 }
 
 .kpi-text {
@@ -652,7 +660,7 @@ const fullscreen = async () => {
 
 .kpi-value {
   margin: 2px 0;
-  font-size: 38px;
+  font-size: 34px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
@@ -682,8 +690,9 @@ const fullscreen = async () => {
 }
 
 .kpi-spark {
-  flex: 0 0 40%;
-  height: 56px;
+  flex: 0 1 44%;
+  min-width: 60px;
+  height: 52px;
 }
 
 .dot {
@@ -952,14 +961,12 @@ const fullscreen = async () => {
   top: 0;
   right: 0;
 }
-
-/* Borderless blocks on a plain white (light) or black (dark) surface. */
 </style>
 <!-- Unscoped: the platform switches theme with an html.dark class. -->
 <style>
 html.dark .closet-screen {
-  --screen-bg: #000;
-  --screen-panel: #101010;
+  --screen-bg: var(--el-bg-color-page);
+  --screen-panel: #141414;
   --screen-strong: #f5f7fa;
   --screen-text: #a9bddb;
   --screen-sub: #6f86ab;

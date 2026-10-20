@@ -1,6 +1,6 @@
 import type { EChartsOption, SeriesOption } from "echarts";
 
-// Only the screen's surface follows the theme (white or black); charts keep their colors.
+// Only the card surface follows the theme (white or near-black); charts keep their colors.
 export type ScreenTheme = "light" | "dark";
 type Tone = {
   text: string;
@@ -24,7 +24,7 @@ const tones: Record<ScreenTheme, Tone> = {
     sub: "#9ca3af",
     line: "rgba(0, 0, 0, 0.08)",
     track: "rgba(0, 0, 0, 0.06)",
-    surface: "#f5f6f8",
+    surface: "#ffffff",
     tooltipBg: "#ffffff",
     tooltipBorder: "rgba(0, 0, 0, 0.14)",
     glow: false,
@@ -47,7 +47,7 @@ const tones: Record<ScreenTheme, Tone> = {
     sub: "#6f86ab",
     line: "rgba(255, 255, 255, 0.1)",
     track: "rgba(255, 255, 255, 0.08)",
-    surface: "#101010",
+    surface: "#141414",
     tooltipBg: "#141414",
     tooltipBorder: "rgba(255, 255, 255, 0.2)",
     glow: true,
