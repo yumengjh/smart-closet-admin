@@ -17,6 +17,7 @@ import { metricNames, closetFamilyLabel } from "@/api/closet/insights";
 import { sourceLabel } from "../insights/chartOptions";
 import ClosetUnavailable from "../ClosetUnavailable.vue";
 import { useClosetRequest, formatTime } from "../useClosetRequest";
+import { useAppStoreHook } from "@/store/modules/app";
 import CountUp from "./CountUp.vue";
 import ScreenChart from "./ScreenChart.vue";
 import ScreenControls from "./ScreenControls.vue";
@@ -89,6 +90,19 @@ const dailySeries = (metric: string) =>
 const sparkFor = (metric: string, index: number) =>
   sparkOption(theme.value, dailySeries(metric), index);
 
+// The home screen opens with the side menu folded for more room; leaving restores it unless the user changed it meanwhile.
+const app = useAppStoreHook();
+let foldedByScreen = false;
+const foldMenu = () => {
+  if (app.device === "mobile" || !app.sidebar.opened) return;
+  app.toggleSideBar();
+  foldedByScreen = true;
+};
+const restoreMenu = () => {
+  if (foldedByScreen && !app.sidebar.opened) app.toggleSideBar();
+  foldedByScreen = false;
+};
+
 const clearTimer = () => {
   if (timer) clearTimeout(timer);
   timer = undefined;
@@ -134,10 +148,12 @@ onMounted(() => {
   });
   document.addEventListener("visibilitychange", visibility);
   window.addEventListener("resize", fit);
+  foldMenu();
   fit();
   void load();
 });
 onActivated(() => {
+  foldMenu();
   fit();
   if (!active) {
     active = true;
@@ -145,10 +161,12 @@ onActivated(() => {
   }
 });
 onDeactivated(() => {
+  restoreMenu();
   active = false;
   clearTimer();
 });
 onBeforeUnmount(() => {
+  restoreMenu();
   themeObserver.disconnect();
   active = false;
   clearTimer();
