@@ -23,13 +23,16 @@ import ScreenControls from "./ScreenControls.vue";
 import {
   barOption,
   columnOption,
+  donutOption,
+  growthOption,
+  heatmapOption,
   ringOption,
   roseOption,
   sparkOption,
-  seriesColors,
   trendOption,
   type ScreenTheme
 } from "./screenOptions";
+import { featureLabel } from "../insights/chartOptions";
 defineOptions({ name: "ClosetDashboard" });
 const { loading, unavailable, errorMessage, run } = useClosetRequest();
 const snapshot = ref<DashboardSnapshot>();
@@ -115,13 +118,14 @@ const visibility = () => {
 const fit = async () => {
   if (!host.value || document.fullscreenElement) return;
   const top = host.value.getBoundingClientRect().top;
-  height.value = Math.max(560, Math.floor(window.innerHeight - top - 24));
+  // Four rows of panels need about 860px; shorter windows scroll instead of squashing the charts.
+  height.value = Math.max(860, Math.floor(window.innerHeight - top - 24));
   // Layout chrome below the content (e.g. the footer) must not cause a scrollbar either.
   await nextTick();
   const wrap = host.value?.closest(".el-scrollbar__wrap");
   const extra = wrap ? wrap.scrollHeight - wrap.clientHeight : 0;
   if (extra > 0 && height.value)
-    height.value = Math.max(560, height.value - extra);
+    height.value = Math.max(860, height.value - extra);
 };
 onMounted(() => {
   themeObserver.observe(document.documentElement, {
@@ -248,20 +252,138 @@ const tokens = computed(() =>
 const tokenTotal = computed(() =>
   dailySeries("model_tokens").reduce((sum, value) => sum + value, 0)
 );
-const layers = computed(() => {
-  const total = tile("usersTotal") || 0;
-  return [
-    { label: "当前在线", value: tile("onlineNow") ?? 0 },
-    { label: "今日活跃", value: tile("activeToday") ?? 0 },
-    { label: "七日活跃", value: tile("active7d") ?? 0 },
-    { label: "三十日活跃", value: tile("active30d") ?? 0 },
-    { label: "业务用户", value: total }
-  ].map((layer, index) => ({
-    ...layer,
-    width: total ? Math.min(100, (layer.value / total) * 100) : 0,
-    color: seriesColors(theme.value)[index % 5]
+const styles = computed(() =>
+  barOption(
+    theme.value,
+    (snapshot.value?.distributions.styles ?? [])
+      .slice(0, 8)
+      .map(item => ({ name: item.key, value: item.count }))
+  )
+);
+const heat = computed(() =>
+  heatmapOption(theme.value, snapshot.value?.heatmap?.cells ?? [])
+);
+const heatTotal = computed(() =>
+  (snapshot.value?.heatmap?.cells ?? []).reduce((sum, cell) => sum + cell[2], 0)
+);
+const peak = computed(() => {
+  const cells = snapshot.value?.heatmap?.cells ?? [];
+  const top = cells.reduce<[number, number, number] | undefined>(
+    (best, cell) => (!best || cell[2] > best[2] ? cell : best),
+    undefined
+  );
+  const days = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+  return top && top[2] ? `${days[top[0] - 1]} ${top[1]}:00` : "—";
+});
+const growth = computed(() =>
+  growthOption(
+    theme.value,
+    snapshot.value?.growth?.days ?? [],
+    snapshot.value?.growth?.newUsers ?? [],
+    snapshot.value?.growth?.cumulative ?? []
+  )
+);
+const newUsers30d = computed(() =>
+  (snapshot.value?.growth?.newUsers ?? []).reduce((sum, n) => sum + n, 0)
+);
+const viaNames: Record<string, string> = {
+  INVITE: "邀请码",
+  OPEN: "自助注册",
+  ADMIN: "管理员创建"
+};
+const via = computed(() =>
+  (snapshot.value?.distributions.registeredVia ?? []).map(item => ({
+    label: viaNames[item.key] ?? item.key,
+    count: item.count
+  }))
+);
+const sizeColors = ["#cbd5e1", "#93c5fd", "#60a5fa", "#2563eb", "#1e3a8a"];
+const closetSizes = computed(() => {
+  const items = snapshot.value?.distributions.closetSizes ?? [];
+  const total = items.reduce((sum, item) => sum + item.count, 0) || 1;
+  return items.map((item, index) => ({
+    label: item.key === "0" ? "空衣柜" : `${item.key} 件`,
+    count: item.count,
+    width: (item.count / total) * 100,
+    color: sizeColors[index % sizeColors.length]
   }));
 });
+const fitColors: Record<string, string> = {
+  女款: "#e11d48",
+  男款: "#2563eb",
+  中性: "#0d9488"
+};
+const genderFits = computed(() =>
+  donutOption(
+    theme.value,
+    (snapshot.value?.distributions.genderFits ?? []).map(item => ({
+      name: item.key,
+      value: item.count
+    })),
+    fitColors
+  )
+);
+const aiFeatures = computed(() => {
+  const rows = snapshot.value?.distributions.aiFeatures30d ?? [];
+  const max = Math.max(1, ...rows.map(row => row.tokens));
+  return rows.slice(0, 4).map(row => ({
+    label: featureLabel(row.key),
+    calls: row.calls,
+    tokens: row.tokens,
+    width: (row.tokens / max) * 100
+  }));
+});
+const compactNumber = (value: number) =>
+  value >= 100_000_000
+    ? `${(value / 100_000_000).toFixed(1)} 亿`
+    : value >= 10_000
+      ? `${(value / 10_000).toFixed(1)} 万`
+      : value.toLocaleString();
+const feedText = (item: NonNullable<DashboardSnapshot["feed"]>[number]) => {
+  switch (item.kind) {
+    case "GARMENT_ADDED": {
+      const name =
+        item.label && item.label !== "UNKNOWN"
+          ? closetFamilyLabel(item.label)
+          : "衣物";
+      return `有人新入柜了一件${name}`;
+    }
+    case "OUTFIT_SAVED":
+      return "有人保存了一套搭配";
+    case "WEAR_LOGGED":
+      return "有人记录了今日穿搭";
+    case "RECOMMENDATION_LIKED":
+      return "有人点赞了一套推荐";
+    case "USER_REGISTERED":
+      return `新用户${item.label === "INVITE" ? "凭邀请码" : item.label === "OPEN" ? "自助" : "由管理员开通"}注册`;
+  }
+};
+const feedKinds = {
+  GARMENT_ADDED: "#2563eb",
+  OUTFIT_SAVED: "#d97706",
+  WEAR_LOGGED: "#0d9488",
+  RECOMMENDATION_LIKED: "#e11d48",
+  USER_REGISTERED: "#7c3aed"
+} as const;
+const ago = (at: number) => {
+  const diff = Math.max(0, (snapshot.value?.generatedAtMs ?? Date.now()) - at);
+  if (diff < 60_000) return "刚刚";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`;
+  return `${Math.floor(diff / 86_400_000)} 天前`;
+};
+// Long feeds scroll as a loop: the list is doubled and the track moves by half its height.
+const rolledFeed = computed(() =>
+  feed.value.length > 6 ? [...feed.value, ...feed.value] : feed.value
+);
+const feed = computed(() =>
+  (snapshot.value?.feed ?? []).map((item, index) => ({
+    key: `${item.atMs}-${index}`,
+    text: feedText(item),
+    when: ago(item.atMs),
+    color: feedKinds[item.kind]
+  }))
+);
 const usage = computed(() => [
   { label: "打卡", value: tile("wearLogsToday") },
   { label: "助手消息", value: tile("agentMessagesToday") },
@@ -305,7 +427,29 @@ const fullscreen = async () => {
             />
           </div>
         </div>
+        <div class="kpi">
+          <div class="kpi-text">
+            <span class="kpi-label">今日活跃</span>
+            <strong class="kpi-value"
+              ><CountUp :value="tile('activeToday')" :replay="replay"
+            /></strong>
+            <span class="kpi-sub"
+              >7 日 <b>{{ tile("active7d") ?? 0 }}</b> · 30 日
+              <b>{{ tile("active30d") ?? 0 }}</b> · 在线
+              <b>{{ tile("onlineNow") ?? 0 }}</b></span
+            >
+          </div>
+        </div>
         <div class="kpi live">
+          <ScreenControls
+            v-model="auto"
+            class="live-control"
+            :loading="loading"
+            :updated-at="formatTime(snapshot.generatedAtMs)"
+            @refresh="load"
+            @fullscreen="fullscreen"
+            @auto="toggleAuto"
+          />
           <div class="kpi-text">
             <span class="kpi-label"
               ><i class="dot" :class="{ ok: healthy }" />运行状态</span
@@ -322,14 +466,6 @@ const fullscreen = async () => {
             >
           </div>
         </div>
-        <ScreenControls
-          v-model="auto"
-          :loading="loading"
-          :updated-at="formatTime(snapshot.generatedAtMs)"
-          @refresh="load"
-          @fullscreen="fullscreen"
-          @auto="toggleAuto"
-        />
       </div>
 
       <div class="panel p-categories">
@@ -411,6 +547,48 @@ const fullscreen = async () => {
         <p v-else class="empty">过去七天暂无推荐记录</p>
       </div>
 
+      <div class="panel p-styles">
+        <div class="panel-head">
+          <h3>风格偏好 TOP</h3>
+          <span class="hint">按衣物风格标签</span>
+        </div>
+        <div class="body">
+          <ScreenChart
+            v-if="snapshot.distributions.styles?.length"
+            :option="styles"
+            :replay="replay"
+          />
+          <p v-else class="empty">入柜后显示风格分布</p>
+        </div>
+      </div>
+      <div class="panel p-heat">
+        <div class="panel-head">
+          <h3>活跃时段热力 · 近 {{ snapshot.heatmap?.days ?? 28 }} 天</h3>
+          <span class="hint"
+            >共 {{ compactNumber(heatTotal) }} 次操作 · 高峰 {{ peak }}</span
+          >
+        </div>
+        <div class="body">
+          <ScreenChart :option="heat" :replay="replay" />
+        </div>
+      </div>
+      <div class="panel p-feed">
+        <div class="panel-head">
+          <h3>实时动态</h3>
+          <span class="hint live-hint"><i class="dot ok" />去标识展示</span>
+        </div>
+        <div v-if="feed.length" class="feed">
+          <ul class="feed-track" :class="{ rolling: feed.length > 6 }">
+            <li v-for="(item, index) in rolledFeed" :key="index">
+              <i :style="{ background: item.color }" />
+              <span class="feed-text">{{ item.text }}</span>
+              <time>{{ item.when }}</time>
+            </li>
+          </ul>
+        </div>
+        <p v-else class="empty">还没有动态</p>
+      </div>
+
       <div class="panel p-colors">
         <h3>衣物颜色 TOP</h3>
         <div class="body">
@@ -422,9 +600,39 @@ const fullscreen = async () => {
           <p v-else class="empty">入柜后显示颜色分布</p>
         </div>
       </div>
-      <div class="panel p-seasons">
-        <h3>适穿季节</h3>
+      <div class="panel p-growth">
+        <div class="panel-head">
+          <h3>用户增长 · 近 30 天</h3>
+          <span class="hint">新增 {{ newUsers30d }}</span>
+        </div>
+        <div class="via">
+          <span v-for="item in via" :key="item.label"
+            >{{ item.label }} <b>{{ item.count }}</b></span
+          >
+        </div>
         <div class="body">
+          <ScreenChart :option="growth" :replay="replay" />
+        </div>
+        <div class="sizes" aria-label="衣柜规模分布">
+          <div class="sizes-bar">
+            <i
+              v-for="item in closetSizes"
+              :key="item.label"
+              :style="{ width: `${item.width}%`, background: item.color }"
+              :title="`${item.label}：${item.count} 位用户`"
+            />
+          </div>
+          <div class="sizes-legend">
+            <span v-for="item in closetSizes" :key="item.label"
+              ><i :style="{ background: item.color }" />{{ item.label }}
+              {{ item.count }}</span
+            >
+          </div>
+        </div>
+      </div>
+      <div class="panel p-seasons">
+        <h3>适穿季节 · 版型</h3>
+        <div class="body pair">
           <ScreenChart
             v-if="snapshot.distributions.seasons.length"
             :option="seasons"
@@ -432,29 +640,17 @@ const fullscreen = async () => {
             cycle="slice"
             :count="seasonCount"
           />
-          <p v-else class="empty">入柜后显示季节分布</p>
+          <ScreenChart
+            v-if="snapshot.distributions.genderFits?.length"
+            :option="genderFits"
+            :replay="replay"
+          />
         </div>
-      </div>
-      <div class="panel p-layers">
-        <h3>用户活跃分层</h3>
-        <ul class="layers">
-          <li v-for="layer in layers" :key="layer.label">
-            <span class="layer-label">{{ layer.label }}</span>
-            <span class="layer-track"
-              ><i
-                :style="{
-                  width: `${layer.width}%`,
-                  background: layer.color
-                }"
-            /></span>
-            <b><CountUp :value="layer.value" :replay="replay" /></b>
-          </li>
-        </ul>
       </div>
       <div class="panel p-usage">
         <div class="panel-head">
-          <h3>今日用量与 Token</h3>
-          <span class="hint">30 天合计 {{ tokenTotal.toLocaleString() }}</span>
+          <h3>AI 用量</h3>
+          <span class="hint">30 天 Token {{ compactNumber(tokenTotal) }}</span>
         </div>
         <div class="chips">
           <div v-for="item in usage" :key="item.label">
@@ -462,6 +658,15 @@ const fullscreen = async () => {
             ><b><CountUp :value="item.value" :replay="replay" /></b>
           </div>
         </div>
+        <ul v-if="aiFeatures.length" class="features">
+          <li v-for="item in aiFeatures" :key="item.label">
+            <span class="feature-name">{{ item.label }}</span>
+            <span class="feature-track"
+              ><i :style="{ width: `${item.width}%` }"
+            /></span>
+            <span class="feature-count">{{ compactNumber(item.tokens) }}</span>
+          </li>
+        </ul>
         <div class="body">
           <ScreenChart :option="tokens" :replay="replay" />
         </div>
@@ -502,6 +707,12 @@ const fullscreen = async () => {
   }
 }
 
+@keyframes roll {
+  to {
+    transform: translateY(-50%);
+  }
+}
+
 @keyframes sweep {
   from {
     transform: translateX(-100%);
@@ -514,11 +725,13 @@ const fullscreen = async () => {
 
 @media (prefers-reduced-motion: reduce) {
   .dot.ok,
-  .layer-track i::after {
+  .feature-track i::after,
+  .feed-track.rolling {
     animation: none;
   }
 
-  .layer-track i,
+  .feature-track i,
+  .sizes-bar i,
   .source-shown,
   .source-shown i {
     transition: none;
@@ -562,10 +775,9 @@ const fullscreen = async () => {
 
   position: relative;
   display: grid;
-  grid-template: 92px minmax(0, 1.3fr) minmax(0, 1fr) / repeat(
-      12,
-      minmax(0, 1fr)
-    );
+  grid-template:
+    92px minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr)
+    / repeat(12, minmax(0, 1fr));
   gap: 14px;
   min-height: 0;
   padding: 4px 0;
@@ -621,15 +833,22 @@ const fullscreen = async () => {
 
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr)) 34px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   grid-column: 1 / -1;
   gap: 14px;
   align-items: stretch;
   min-height: 0;
 }
 
-.kpi-row > :last-child {
-  align-self: start;
+/* Screen settings live in the corner of the status card instead of taking a column of their own. */
+.kpi.live {
+  position: relative;
+}
+
+.live-control {
+  position: absolute;
+  top: 8px;
+  right: 8px;
 }
 
 .kpi {
@@ -851,52 +1070,183 @@ const fullscreen = async () => {
   color: var(--screen-strong);
 }
 
+.p-styles,
+.p-feed,
 .p-colors,
+.p-growth,
 .p-seasons,
-.p-layers,
 .p-usage {
   grid-column: span 3;
 }
 
-.layers {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 4px;
-  justify-content: space-around;
-  min-height: 0;
+.p-heat {
+  grid-column: span 6;
 }
 
-.layers li {
+.pair {
   display: grid;
-  grid-template-columns: 62px minmax(0, 1fr) 42px;
-  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.live-hint {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.feed {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 8%,
+    #000 88%,
+    transparent
+  );
+}
+
+.feed-track li {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  height: 30px;
+  font-size: 12px;
+  border-bottom: 1px dashed var(--screen-chip);
+}
+
+.feed-track li i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.feed-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--screen-text);
+  white-space: nowrap;
+}
+
+.feed-track time {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--screen-sub);
+}
+
+/* The list is doubled, so moving by half its height loops seamlessly. */
+.feed-track.rolling {
+  animation: roll 40s linear infinite;
+}
+
+.feed:hover .feed-track.rolling {
+  animation-play-state: paused;
+}
+
+.via {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--screen-sub);
+}
+
+.via b,
+.sizes-legend {
+  font-variant-numeric: tabular-nums;
+}
+
+.via b {
+  font-weight: 500;
+  color: var(--screen-strong);
+}
+
+.sizes {
+  margin-top: 8px;
+}
+
+.sizes-bar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.sizes-bar i {
+  display: block;
+  min-width: 2px;
+  height: 100%;
+  transition: width 0.9s ease;
+}
+
+.sizes-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--screen-sub);
+}
+
+.sizes-legend span {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.sizes-legend i {
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+}
+
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.features li {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) 52px;
+  gap: 8px;
   align-items: center;
   font-size: 12px;
 }
 
-.layer-label {
+.feature-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--screen-text);
+  white-space: nowrap;
 }
 
-.layer-track {
-  height: 8px;
+.feature-track {
+  height: 6px;
   overflow: hidden;
   background: var(--screen-chip);
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
-.layer-track i {
+.feature-track i {
   position: relative;
   display: block;
   height: 100%;
   overflow: hidden;
-  border-radius: 4px;
+  background: var(--screen-accent);
+  border-radius: 3px;
   transition: width 0.9s ease;
 }
 
 /* A light sweep running along each bar keeps the panel feeling live. */
-.layer-track i::after {
+.feature-track i::after {
   position: absolute;
   inset: 0;
   width: 40%;
@@ -910,8 +1260,7 @@ const fullscreen = async () => {
   animation: sweep 2.8s ease-in-out infinite;
 }
 
-.layers b {
-  font-weight: 500;
+.feature-count {
   font-variant-numeric: tabular-nums;
   color: var(--screen-strong);
   text-align: right;

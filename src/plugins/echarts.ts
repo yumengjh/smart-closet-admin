@@ -5,7 +5,8 @@ import {
   BarChart,
   LineChart,
   GaugeChart,
-  EffectScatterChart
+  EffectScatterChart,
+  HeatmapChart
 } from "echarts/charts";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import {
@@ -29,6 +30,7 @@ use([
   LineChart,
   GaugeChart,
   EffectScatterChart,
+  HeatmapChart,
   CanvasRenderer,
   SVGRenderer,
   GridComponent,

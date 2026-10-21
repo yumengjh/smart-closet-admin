@@ -427,3 +427,170 @@ export function sparkOption(
     ]
   };
 }
+
+const WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+
+/** Weekday × hour activity heat; cells are [weekday 1–7, hour 0–23, count]. */
+export function heatmapOption(
+  theme: ScreenTheme,
+  cells: Array<[number, number, number]>
+): EChartsOption {
+  const t = tones[theme];
+  const max = Math.max(1, ...cells.map(cell => cell[2]));
+  return {
+    tooltip: {
+      ...tooltipOf(t),
+      formatter: (params: unknown) => {
+        const [hour, day, count] = (
+          params as { value: [number, number, number] }
+        ).value;
+        return `${WEEKDAYS[day]} ${hour}:00–${hour + 1}:00<br/>操作 ${count} 次`;
+      }
+    },
+    grid: { left: 2, right: 4, top: 4, bottom: 18, containLabel: true },
+    xAxis: {
+      type: "category",
+      data: Array.from({ length: 24 }, (_, hour) => `${hour}`),
+      splitArea: { show: false },
+      axisTick: { show: false },
+      axisLine: { show: false },
+      axisLabel: {
+        color: t.sub,
+        fontSize: 10,
+        interval: 2,
+        formatter: (value: string) => `${value}时`
+      }
+    },
+    yAxis: {
+      type: "category",
+      data: WEEKDAYS,
+      inverse: true,
+      axisTick: { show: false },
+      axisLine: { show: false },
+      axisLabel: { color: t.text, fontSize: 11 }
+    },
+    visualMap: {
+      show: false,
+      min: 0,
+      max,
+      inRange: {
+        color:
+          theme === "dark"
+            ? ["#0b1a2a", "#0e4a6b", "#0891b2", "#22d3ee", "#a5f3fc"]
+            : ["#eef2ff", "#c7d2fe", "#818cf8", "#4f46e5", "#312e81"]
+      }
+    },
+    series: [
+      {
+        type: "heatmap",
+        data: cells.map(([day, hour, count]) => [hour, day - 1, count]),
+        itemStyle: { borderColor: t.surface, borderWidth: 2, borderRadius: 3 },
+        emphasis: { itemStyle: { borderColor: t.strong, borderWidth: 1 } }
+      }
+    ]
+  };
+}
+
+/** New users per day as bars with the running total as a line on its own axis. */
+export function growthOption(
+  theme: ScreenTheme,
+  days: string[],
+  added: number[],
+  cumulative: number[]
+): EChartsOption {
+  const t = tones[theme];
+  return {
+    color: [t.series[1], t.series[0]],
+    tooltip: { ...tooltipOf(t), trigger: "axis" },
+    grid: { left: 2, right: 4, top: 22, bottom: 0, containLabel: true },
+    legend: {
+      top: 0,
+      right: 0,
+      icon: "roundRect",
+      itemWidth: 12,
+      itemHeight: 4,
+      textStyle: { color: t.text, fontSize: 11 }
+    },
+    xAxis: {
+      type: "category",
+      data: days.map(day => day.slice(5)),
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: t.line } },
+      axisLabel: { color: t.sub, fontSize: 10, hideOverlap: true }
+    },
+    yAxis: [
+      { type: "value", show: false, minInterval: 1 },
+      {
+        type: "value",
+        splitNumber: 3,
+        axisLabel: { color: t.sub, fontSize: 10 },
+        splitLine: { lineStyle: { color: t.line, type: "dashed" } }
+      }
+    ],
+    series: [
+      {
+        name: "新增用户",
+        type: "bar",
+        barMaxWidth: 6,
+        itemStyle: {
+          borderRadius: [2, 2, 0, 0],
+          color: gradient(t.series[1], 0.9, 0.35)
+        },
+        data: added
+      },
+      {
+        name: "累计用户",
+        type: "line",
+        yAxisIndex: 1,
+        smooth: 0.3,
+        showSymbol: false,
+        lineStyle: {
+          width: 2,
+          shadowBlur: t.glow ? 8 : 0,
+          shadowColor: hexAlpha(t.series[0], 0.6)
+        },
+        areaStyle: { color: gradient(t.series[0], 0.18) },
+        data: cumulative
+      }
+    ]
+  };
+}
+
+/** Small donut with the total in the middle. */
+export function donutOption(
+  theme: ScreenTheme,
+  data: { name: string; value: number }[],
+  colors?: Record<string, string>
+): EChartsOption {
+  const t = tones[theme];
+  const items = data.filter(item => item.value > 0);
+  return {
+    color: t.ramp,
+    tooltip: {
+      ...tooltipOf(t),
+      trigger: "item",
+      formatter: "{b}：{c}（{d}%）"
+    },
+    series: [
+      {
+        type: "pie",
+        radius: ["46%", "70%"],
+        center: ["50%", "52%"],
+        itemStyle: { borderRadius: 3, borderWidth: 2, borderColor: t.surface },
+        label: {
+          color: t.text,
+          fontSize: 11,
+          formatter: "{b}\n{d}%",
+          lineHeight: 14
+        },
+        labelLine: { lineStyle: { color: t.line }, length: 6, length2: 6 },
+        data: items.map((item, index) => ({
+          ...item,
+          itemStyle: {
+            color: colors?.[item.name] ?? t.ramp[index % t.ramp.length]
+          }
+        }))
+      }
+    ]
+  };
+}

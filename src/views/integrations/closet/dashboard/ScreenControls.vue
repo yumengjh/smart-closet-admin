@@ -50,12 +50,12 @@ const auto = defineModel<boolean>({ required: true });
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  font-size: 18px;
-  color: var(--screen-text);
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+  color: var(--screen-sub);
   cursor: pointer;
-  background: var(--screen-panel);
+  background: transparent;
   border: 0;
   border-radius: 8px;
   transition:
@@ -67,6 +67,7 @@ const auto = defineModel<boolean>({ required: true });
 .screen-control:focus-visible {
   color: var(--screen-strong);
   outline: none;
+  background: var(--screen-chip);
 }
 
 .control-body h3 {

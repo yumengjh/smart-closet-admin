@@ -103,7 +103,24 @@ export type DashboardSnapshot = {
       shown: number;
       adopted: number;
     }>;
+    styles?: CountItem[];
+    genderFits?: CountItem[];
+    closetSizes?: CountItem[];
+    registeredVia?: CountItem[];
+    aiFeatures30d?: Array<{ key: string; calls: number; tokens: number }>;
   };
+  growth?: { days: string[]; newUsers: number[]; cumulative: number[] };
+  heatmap?: { days: number; cells: Array<[number, number, number]> };
+  feed?: Array<{
+    atMs: number;
+    kind:
+      | "GARMENT_ADDED"
+      | "OUTFIT_SAVED"
+      | "WEAR_LOGGED"
+      | "RECOMMENDATION_LIKED"
+      | "USER_REGISTERED";
+    label: string | null;
+  }>;
   ops: {
     status: string;
     issues: number;
