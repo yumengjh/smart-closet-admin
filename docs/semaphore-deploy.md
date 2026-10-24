@@ -14,10 +14,12 @@
 
 该 Secret 里的 `DEPLOY_PATH`、`DEPLOY_SITE_URL`、`FRONTEND_API_BASE_URL` 属于用户端站点，**这里不读取**，避免覆盖用户端。本站点自己的可选变量（写进同一个 Secret）：
 
-| 变量                | 默认值                                            |
-| ------------------- | ------------------------------------------------- |
-| `ADMIN_DEPLOY_PATH` | `/opt/1panel/www/sites/yuda-admin.yumg.cn/index`  |
-| `ADMIN_SITE_URL`    | `https://yuda-admin.yumg.cn/`（仅用于部署后核对） |
+| 变量                      | 默认值                                                                                               |
+| ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `ADMIN_DEPLOY_PATH`       | `/opt/1panel/www/sites/yuda-admin.yumg.cn/index`                                                     |
+| `ADMIN_SITE_URL`          | `https://yuda-admin.yumg.cn/`（仅用于部署后核对）                                                    |
+| `ADMIN_CLOSET_PUBLIC_URL` | `https://yuda.yumg.cn`（构建时写入 `VITE_CLOSET_PUBLIC_URL`，生成 `/register?invite=CODE` 邀请链接） |
+| `ADMIN_API_BASE_URL`      | 空（构建时写入 `VITE_API_BASE_URL`；空表示请求同域 `/api/v1`）                                       |
 
 ## 反向代理
 
