@@ -11,8 +11,9 @@
 # pick up the user-facing site's values:
 #   ADMIN_CLOSET_PUBLIC_URL  -> VITE_CLOSET_PUBLIC_URL, address of the user-facing site for /register?invite=CODE links
 #                               (default https://yuda.yumg.cn)
-#   ADMIN_API_BASE_URL       -> VITE_API_BASE_URL, empty by default: the page calls /api/v1 on its own domain
-# The page calls /api/v1 on its own domain: the reverse proxy of the site forwards /api/ to the admin backend.
+#   ADMIN_API_BASE_URL       -> VITE_API_BASE_URL, address of the admin backend (default https://yuda-admin-server.yumg.cn);
+#                               "/api/v1" is appended when missing. The backend must allow this site's origin (CORS).
+# The page calls the admin backend directly on its own domain (VITE_API_BASE_URL), no /api proxy on this site.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -22,8 +23,10 @@ case "$TARGET" in */yuda.yumg.cn/*) echo "ADMIN_DEPLOY_PATH 指向用户端站�
 SITE_URL=${ADMIN_SITE_URL:-https://yuda-admin.yumg.cn/}
 
 export VITE_CLOSET_PUBLIC_URL=${ADMIN_CLOSET_PUBLIC_URL:-https://yuda.yumg.cn}
-export VITE_API_BASE_URL=${ADMIN_API_BASE_URL:-}
-echo "构建变量：VITE_CLOSET_PUBLIC_URL=$VITE_CLOSET_PUBLIC_URL VITE_API_BASE_URL=${VITE_API_BASE_URL:-（空，同域 /api/v1）}"
+api=${ADMIN_API_BASE_URL:-https://yuda-admin-server.yumg.cn}; api=${api%/}
+case "$api" in */api/v1) ;; *) api="$api/api/v1" ;; esac
+export VITE_API_BASE_URL=$api
+echo "构建变量：VITE_CLOSET_PUBLIC_URL=$VITE_CLOSET_PUBLIC_URL VITE_API_BASE_URL=$VITE_API_BASE_URL"
 
 # Build; the commit goes into version.txt so the final check can tell this build from an older one.
 pnpm build
