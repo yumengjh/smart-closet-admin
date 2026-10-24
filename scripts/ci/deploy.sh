@@ -7,6 +7,11 @@
 # so this deployment can never overwrite it. This site has its own, optional:
 #   ADMIN_DEPLOY_PATH  default /opt/1panel/www/sites/yuda-admin.yumg.cn/index
 #   ADMIN_SITE_URL     default https://yuda-admin.yumg.cn/ (only used for the final check)
+# Build-time variables (baked into the page), also taken from that secret under their own ADMIN_ names so they never
+# pick up the user-facing site's values:
+#   ADMIN_CLOSET_PUBLIC_URL  -> VITE_CLOSET_PUBLIC_URL, address of the user-facing site for /register?invite=CODE links
+#                               (default https://yuda.yumg.cn)
+#   ADMIN_API_BASE_URL       -> VITE_API_BASE_URL, empty by default: the page calls /api/v1 on its own domain
 # The page calls /api/v1 on its own domain: the reverse proxy of the site forwards /api/ to the admin backend.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -15,6 +20,10 @@ TARGET=${ADMIN_DEPLOY_PATH:-/opt/1panel/www/sites/yuda-admin.yumg.cn/index}
 case "$TARGET" in /*/*/*) ;; *) echo "ADMIN_DEPLOY_PATH 太短，拒绝覆盖：$TARGET"; exit 1 ;; esac
 case "$TARGET" in */yuda.yumg.cn/*) echo "ADMIN_DEPLOY_PATH 指向用户端站点，拒绝覆盖：$TARGET"; exit 1 ;; esac
 SITE_URL=${ADMIN_SITE_URL:-https://yuda-admin.yumg.cn/}
+
+export VITE_CLOSET_PUBLIC_URL=${ADMIN_CLOSET_PUBLIC_URL:-https://yuda.yumg.cn}
+export VITE_API_BASE_URL=${ADMIN_API_BASE_URL:-}
+echo "构建变量：VITE_CLOSET_PUBLIC_URL=$VITE_CLOSET_PUBLIC_URL VITE_API_BASE_URL=${VITE_API_BASE_URL:-（空，同域 /api/v1）}"
 
 # Build; the commit goes into version.txt so the final check can tell this build from an older one.
 pnpm build
