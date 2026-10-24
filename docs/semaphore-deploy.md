@@ -19,8 +19,8 @@
 | `ADMIN_DEPLOY_PATH`       | `/opt/1panel/www/sites/yuda-admin.yumg.cn/index`                                                     |
 | `ADMIN_SITE_URL`          | `https://yuda-admin.yumg.cn/`（仅用于部署后核对）                                                    |
 | `ADMIN_CLOSET_PUBLIC_URL` | `https://yuda.yumg.cn`（构建时写入 `VITE_CLOSET_PUBLIC_URL`，生成 `/register?invite=CODE` 邀请链接） |
-| `ADMIN_API_BASE_URL`      | 空（构建时写入 `VITE_API_BASE_URL`；空表示请求同域 `/api/v1`）                                       |
+| `ADMIN_API_BASE_URL`      | `https://yuda-admin-server.yumg.cn`（构建时写入 `VITE_API_BASE_URL`，缺少 `/api/v1` 时自动补上）     |
 
-## 反向代理
+## 后端接口
 
-页面请求同域的 `/api/v1`，站点需要把 `/api/` 反向代理到管理后端（`http://<后端服务器>:<端口>/api/`）。路由使用 Hash 模式，不需要 `try_files`。
+页面直接请求后端域名（`VITE_API_BASE_URL`），本站点不需要 `/api` 反向代理。后端域名反代到管理后端容器的宿主机端口，并且后端的 CORS 来源要包含 `https://yuda-admin.yumg.cn`（刷新 Cookie 为 `SameSite=Strict`，两个域名同属 `yumg.cn`，同站可用）。路由使用 Hash 模式，不需要 `try_files`。

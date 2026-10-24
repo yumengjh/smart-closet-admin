@@ -17,12 +17,17 @@ const rows = ref<Announcement[]>([]),
   loading = ref(false),
   dialog = ref(false),
   editing = ref<string>();
-const page = ref(0), size = ref(20), total = ref(0);
+const page = ref(0),
+  size = ref(20),
+  total = ref(0);
 const form = reactive({ title: "", content: "" });
 const load = async () => {
   loading.value = true;
   try {
-    const { data } = await listAnnouncements({ page: page.value, size: size.value });
+    const { data } = await listAnnouncements({
+      page: page.value,
+      size: size.value
+    });
     rows.value = data.items;
     total.value = data.totalElements;
   } finally {
@@ -58,9 +63,13 @@ const remove = async (row: Announcement) => {
   await deleteAnnouncement(row.id);
   await load();
 };
+const apiBase = (import.meta.env.VITE_API_BASE_URL || "/api/v1").replace(
+  /\/$/,
+  ""
+);
 const preview = (row: Announcement) =>
   window.open(
-    `/api/v1/announcements/${row.id}`,
+    `${apiBase}/announcements/${row.id}`,
     "_blank",
     "noopener,noreferrer"
   );
@@ -117,10 +126,30 @@ onMounted(load);
               >删除</el-button
             ></template
           ></el-table-column
-      ></el-table
-      ><div class="mt-4 flex justify-end"><el-pagination v-model:page-size="size" background layout="total, sizes, prev, pager, next" :current-page="page + 1" :total="total" @current-change="value => { page = value - 1; load(); }" @size-change="value => { size = value; page = 0; load(); }" /></div
-      ></el-card
-    >
+        ></el-table
+      >
+      <div class="mt-4 flex justify-end">
+        <el-pagination
+          v-model:page-size="size"
+          background
+          layout="total, sizes, prev, pager, next"
+          :current-page="page + 1"
+          :total="total"
+          @current-change="
+            value => {
+              page = value - 1;
+              load();
+            }
+          "
+          @size-change="
+            value => {
+              size = value;
+              page = 0;
+              load();
+            }
+          "
+        /></div
+    ></el-card>
     <el-dialog
       v-model="dialog"
       :title="editing ? '编辑公告' : '新建公告'"
