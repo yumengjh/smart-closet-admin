@@ -1,0 +1,25 @@
+# Started by the promotion of a passed pipeline (automatically for vX.Y.Z tags): scripts/ci/deploy.sh.
+version: v1.0
+name: Deploy site
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2404
+
+execution_time_limit:
+  minutes: 20
+
+blocks:
+  - name: Build and deploy site
+    task:
+      secrets:
+        - name: frontend
+      jobs:
+        - name: frontend
+          commands:
+            - checkout
+            - sem-version node 22
+            - corepack enable
+            - cache restore pnpm-$(checksum pnpm-lock.yaml)
+            - pnpm install --frozen-lockfile
+            - bash scripts/ci/deploy.sh
