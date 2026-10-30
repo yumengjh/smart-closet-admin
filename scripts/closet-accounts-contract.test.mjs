@@ -25,12 +25,13 @@ const modules = {
   "element-plus": { ElMessageBox: { confirm: async () => { if (!confirmed) throw "cancel"; } } },
   vue: hooks
 };
+// unplugin-icons 的 ~icons/* 是 Vite 虚拟模块，Node 里无法解析，统一桩成空组件
 function evaluate(source) {
   const exports = {};
   const js = ts.transpileModule(source.replaceAll("import.meta.env.VITE_CLOSET_PUBLIC_URL", "__publicUrl"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
-  runInNewContext(js, { exports, __publicUrl: publicUrl, navigator: { clipboard: { writeText: async () => {} } }, require: name => modules[name] ?? (name.endsWith(".vue") ? {} : require(name)) });
+  runInNewContext(js, { exports, __publicUrl: publicUrl, navigator: { clipboard: { writeText: async () => {} } }, require: name => modules[name] ?? (name.endsWith(".vue") || name.startsWith("~icons/") ? { default: {} } : require(name)) });
   return exports;
 }
 const users = evaluate(await read("src/api/closet/users.ts"));
