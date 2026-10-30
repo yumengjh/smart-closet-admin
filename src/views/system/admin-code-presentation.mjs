@@ -44,6 +44,8 @@ const definitions = {
     "closet:exports:read": ["导出鱼搭数据", "读取按天宽表和去标识事件。"],
     "closet:templates:read": ["查看鱼搭模板", "读取搭配模板和审核记录。"],
     "closet:templates:write": ["审核鱼搭模板", "调整审核状态、启用与加分。"],
+    "closet:styleterms:read": ["查看鱼搭待审风格词", "读取助手学到、等待审核的风格词。"],
+    "closet:styleterms:write": ["审核鱼搭风格词", "批准或驳回风格词，批准后对全站生效。"],
     "resume:manage": ["管理公开简历", "允许查看和编辑公开简历的全部内容。"]
   },
   navigationComponent: {
@@ -65,7 +67,8 @@ const definitions = {
     "closet-dashboard": ["业务大屏", "汇总业务趋势与分布。"],
     "closet-ops": ["运行监控", "鱼搭只读运维。"],
     "closet-exports": ["数据导出", "按天汇总与去标识事件。"],
-    "closet-templates": ["模板审核", "搭配模板人工审核。"]
+    "closet-templates": ["模板审核", "搭配模板人工审核。"],
+    "closet-style-terms": ["风格词审核", "助手学到的风格词人工审核。"]
   },
   ipRuleType: {
     ALLOW: ["允许访问", "命中该规则的 IP 或网段允许访问 API。"],
@@ -102,6 +105,8 @@ const definitions = {
   },
   auditAction: {
     CLOSET_TEMPLATE_REVIEW: ["审核鱼搭模板", "修改模板审核状态、启用与加分。"],
+    CLOSET_STYLE_TERM_APPROVE: ["批准鱼搭风格词", "风格词进入全站词表并对所有用户生效。"],
+    CLOSET_STYLE_TERM_REJECT: ["驳回鱼搭风格词", "风格词不进入全站词表，对提出者也不再生效。"],
     LOGIN_FAILED: ["登录失败", "用户登录验证未通过。"],
     LOGIN_SUCCEEDED: ["登录成功", "用户成功完成登录。"],
     TOKEN_REFRESHED: ["刷新登录会话", "使用刷新令牌签发了新的访问令牌。"],

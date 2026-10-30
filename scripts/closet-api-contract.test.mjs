@@ -47,12 +47,22 @@ for (const [name, method, suffix] of [
   ["getClosetOperationLog", "get", "/ops/operation-log"], ["getClosetDashboard", "get", "/dashboard/snapshot"],
   ["getClosetDailyExport", "get", "/exports/daily"], ["downloadClosetDailyCsv", "get", "/exports/daily"],
   ["getClosetEvents", "get", "/exports/events"], ["getClosetTemplates", "get", "/templates"],
-  ["reviewClosetTemplate", "patch", "/templates/${encodeURIComponent(id)}"]
+  ["reviewClosetTemplate", "patch", "/templates/${encodeURIComponent(id)}"],
+  ["getClosetPendingStyleTerms", "get", "/style-terms/pending"],
+  ["approveClosetStyleTerm", "post", "/style-terms/pending/approve"],
+  ["rejectClosetStyleTerm", "post", "/style-terms/pending/reject"],
+  ["batchReviewClosetStyleTerms", "post", "/style-terms/pending/batch"]
 ]) assertApi(management, name, method, suffix, 'const root = "/closet"');
-for (const key of ["closet-users", "closet-insights", "closet-dashboard", "closet-ops", "closet-exports", "closet-templates"]) {
+for (const key of ["closet-users", "closet-insights", "closet-dashboard", "closet-ops", "closet-exports", "closet-templates", "closet-style-terms"]) {
   for (const file of ["../src/router/utils.ts", "../src/api/routes.ts", "../src/api/navigation.ts", "../src/views/system/menu/index.vue"])
     assert.ok((await readFile(new URL(file, import.meta.url), "utf8")).includes(key), `${key} missing from ${file}`);
 }
 assert.ok(management.includes('arrayFormat: "repeat"'), "multi-value parameters must use repeated query keys");
 assert.ok(management.includes('responseType: "blob"'), "CSV must download as a blob");
-console.log("Closet API contract: all 26 operations covered, plus CSV and 6 component keys.");
+console.log("Closet API contract: all 30 operations covered, plus CSV and 7 component keys.");
+
+// The style word review page must gate every write behind its own permission and never ask for user names.
+const page = await readFile(new URL("../src/views/integrations/closet/style-terms/index.vue", import.meta.url), "utf8");
+assert.ok(page.includes('can("closet:styleterms:write")'), "style term review writes need closet:styleterms:write");
+assert.ok(page.includes("ElMessageBox.confirm"), "approve and reject must be confirmed");
+assert.ok(!/username|owner/i.test(page), "the review page must not handle user names");

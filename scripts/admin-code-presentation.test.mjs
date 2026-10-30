@@ -17,6 +17,9 @@ assert.equal(
   adminCodeLabel("auditAction", "ROLE_PERMISSION_GRANTED"),
   "授予角色权限"
 );
+assert.equal(adminCodeLabel("permission", "closet:styleterms:write"), "审核鱼搭风格词");
+assert.equal(adminCodeLabel("navigationComponent", "closet-style-terms"), "风格词审核");
+assert.equal(adminCodeLabel("auditAction", "CLOSET_STYLE_TERM_REJECT"), "驳回鱼搭风格词");
 assert.equal(adminCodeLabel("auditResult", "SUCCESS"), "成功");
 assert.equal(adminCodeLabel("auditTargetType", "RuntimeSetting"), "运行时配置");
 assert.equal(adminCodeLabel("auditAction", "CUSTOM_EVENT"), "CUSTOM_EVENT");
