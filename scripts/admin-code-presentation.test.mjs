@@ -20,6 +20,8 @@ assert.equal(
 assert.equal(adminCodeLabel("permission", "closet:styleterms:write"), "审核鱼搭风格词");
 assert.equal(adminCodeLabel("navigationComponent", "closet-style-terms"), "风格词审核");
 assert.equal(adminCodeLabel("auditAction", "CLOSET_STYLE_TERM_REJECT"), "驳回鱼搭风格词");
+assert.equal(adminCodeLabel("auditAction", "REFRESH_TOKEN_STALE_VERSION"), "刷新令牌版本过期");
+assert.equal(adminCodeLabel("auditAction", "SQL_CONSOLE_EXECUTED"), "执行 SQL 控制台语句");
 assert.equal(adminCodeLabel("auditResult", "SUCCESS"), "成功");
 assert.equal(adminCodeLabel("auditTargetType", "RuntimeSetting"), "运行时配置");
 assert.equal(adminCodeLabel("auditAction", "CUSTOM_EVENT"), "CUSTOM_EVENT");

@@ -101,7 +101,11 @@ const definitions = {
     IpAccessRule: ["IP 访问规则", "持久化的 API IP 访问控制规则。"],
     Announcement: ["公告", "后台维护的公告内容。"],
     ResumeDocument: ["简历", "公开简历的动态内容文档。"],
-    NavigationMenu: ["后台菜单", "后台动态导航菜单项。"]
+    NavigationMenu: ["后台菜单", "后台动态导航菜单项。"],
+    AvatarCandidate: ["候选头像", "待用户确认的候选头像。"],
+    SqlConsole: ["SQL 控制台", "后台 SQL 控制台。"],
+    MaintenanceGcRun: ["清理任务", "一次存储清理任务运行。"],
+    MaintenanceGcPolicy: ["清理策略", "存储清理策略配置。"]
   },
   auditAction: {
     CLOSET_TEMPLATE_REVIEW: ["审核鱼搭模板", "修改模板审核状态、启用与加分。"],
@@ -137,7 +141,18 @@ const definitions = {
     NAVIGATION_MENU_CREATED: ["创建后台菜单", "新增了一个后台导航菜单项。"],
     NAVIGATION_MENU_UPDATED: ["更新后台菜单", "修改了一个后台导航菜单项。"],
     NAVIGATION_MENU_DELETED: ["删除后台菜单", "删除了一个后台导航菜单项。"],
-    REFRESH_TOKEN_REUSE_DETECTED: ["检测到令牌重用", "同一刷新令牌被重复使用，系统已撤销该令牌家族。"]
+    REFRESH_TOKEN_REUSE_DETECTED: ["检测到令牌重用", "同一刷新令牌被重复使用，系统已撤销该令牌家族。"],
+    REFRESH_TOKEN_STALE_VERSION: ["刷新令牌版本过期", "刷新会话签发后密码已变更，旧会话被拒绝刷新，系统已撤销该令牌家族。"],
+    NAVIGATION_MENU_STATUS_UPDATED: ["更新后台菜单状态", "启用或停用了一个后台导航菜单项。"],
+    USER_AVATAR_UPLOADED: ["上传头像", "用户上传了自己的头像。"],
+    USER_AVATAR_RESET: ["重置头像", "用户将头像恢复为默认。"],
+    ADMIN_USER_AVATAR_RESET: ["管理员重置头像", "管理员将用户头像恢复为默认。"],
+    USER_AVATAR_CANDIDATE_CREATED: ["生成候选头像", "为用户生成了一个候选头像。"],
+    USER_AVATAR_RANDOMIZED: ["随机头像", "用户头像被随机更换。"],
+    GC_POLICY_UPDATED: ["更新清理策略", "修改了存储清理策略。"],
+    GC_RUN_COMPLETED: ["清理任务完成", "存储清理任务已成功执行完毕。"],
+    GC_RUN_FAILED: ["清理任务失败", "存储清理任务执行失败。"],
+    SQL_CONSOLE_EXECUTED: ["执行 SQL 控制台语句", "通过 SQL 控制台执行了一条语句，元数据仅记录类型与长度。"]
   }
 };
 
