@@ -183,6 +183,26 @@ export type TemplateList = {
   active: number;
   items: OutfitTemplate[];
 };
+export type PendingStyleTerm = {
+  term: string;
+  styles: string[];
+  hits: number;
+  proposers: number;
+  legacy: boolean;
+  firstProposedAtMs: number;
+  lastProposedAtMs: number;
+  sharedStyles: string[] | null;
+};
+export type PendingStyleTermPage = Page<PendingStyleTerm> & {
+  vocabulary: string[];
+};
+export type StyleTermTarget = { term: string; proposedStyles: string[] };
+export type StyleTermApproval = StyleTermTarget & { styles?: string[] };
+export type StyleTermBatchResult = {
+  succeeded: number;
+  failed: number;
+  results: Array<StyleTermTarget & { ok: boolean; code?: string }>;
+};
 const root = "/closet";
 const repeatParams = {
   serialize: (query: Record<string, unknown>) =>
@@ -246,5 +266,35 @@ export const reviewClosetTemplate = (id: string, data: TemplateReview) =>
   http.request<ApiResponse<OutfitTemplate>>(
     "patch",
     `${root}/templates/${encodeURIComponent(id)}`,
+    { data }
+  );
+export const getClosetPendingStyleTerms = (params: {
+  page: number;
+  size: number;
+}) =>
+  http.request<ApiResponse<PendingStyleTermPage>>(
+    "get",
+    `${root}/style-terms/pending`,
+    { params }
+  );
+export const approveClosetStyleTerm = (data: StyleTermApproval) =>
+  http.request<ApiResponse<{ term: string; approved: boolean }>>(
+    "post",
+    `${root}/style-terms/pending/approve`,
+    { data }
+  );
+export const rejectClosetStyleTerm = (data: StyleTermTarget) =>
+  http.request<ApiResponse<{ term: string; approved: boolean }>>(
+    "post",
+    `${root}/style-terms/pending/reject`,
+    { data }
+  );
+export const batchReviewClosetStyleTerms = (data: {
+  action: "APPROVE" | "REJECT";
+  items: StyleTermTarget[];
+}) =>
+  http.request<ApiResponse<StyleTermBatchResult>>(
+    "post",
+    `${root}/style-terms/pending/batch`,
     { data }
   );

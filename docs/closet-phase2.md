@@ -10,6 +10,7 @@
 - `/closet/ops`：只读服务健康、模型与内存、索引队列、分页任务及操作日志。
 - `/closet/exports`：最长 366 天宽表查询、CSV 下载、去标识事件筛选和游标翻页、本页 JSON 下载。
 - `/closet/templates`：模板筛选、槽位与来源详情、审核状态/启用/加分编辑。写入需要 closet:templates:write；只读可查看详情。
+- `/closet/style-terms`：风格词审核（鱼搭 #173）。助手从用户对话学到的风格词在这里批准或驳回；列表给出词、映射到的风格、提出次数与人数、首次/最近提出时间，以及全站词表已有映射（批准将替换）。支持单个批准、改映射后批准、驳回和批量批准/驳回（逐项独立处理）。读取需要 closet:styleterms:read，写入需要 closet:styleterms:write；页面不显示用户名。
 
 页面统一沿用 Element Plus，使用现有 ECharts 组件。权限与动态菜单由后端提供，SUPER_ADMIN 在集成开启后获得全部权限。大屏/导出不会调用用户明细、任务所属账号或 AI topUsers 来拼接数据。
 

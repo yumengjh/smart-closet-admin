@@ -366,7 +366,8 @@ onMounted(async () => {
             <el-option label="业务大屏" value="closet-dashboard" />
             <el-option label="运行监控" value="closet-ops" />
             <el-option label="数据导出" value="closet-exports" />
-            <el-option label="模板审核" value="closet-templates" /></el-select
+            <el-option label="模板审核" value="closet-templates" />
+            <el-option label="风格词审核" value="closet-style-terms" /></el-select
         ></el-form-item>
         <el-form-item label="图标"
           ><el-input v-model="form.icon" placeholder="例如 ri/menu-line"
