@@ -4,9 +4,11 @@ const { width } = useWindowSize();
 import { onMounted, ref, watch } from "vue";
 import {
   getClosetOps,
+  getClosetAssistantTokenBudget,
   getClosetTasks,
   getClosetOperationLog,
   type OpsStatus,
+  type SiteTokenBudget,
   type Page,
   type Task,
   type TaskStatus,
@@ -23,6 +25,11 @@ defineOptions({ name: "ClosetOps" });
 const { loading, unavailable, errorMessage, run } = useClosetRequest();
 const tab = ref("status");
 const health = ref<OpsStatus>();
+const tokenBudget = ref<SiteTokenBudget>();
+const tokens = (value: number) => value.toLocaleString();
+const tokenLimit = (value: number) => (value > 0 ? tokens(value) : "不设上限");
+const tokenPercent = (used: number, limit: number) =>
+  limit <= 0 ? 0 : Math.min(100, Math.round((used / limit) * 100));
 const tasks = ref<Page<Task>>();
 const logs = ref<Page<OperationLog>>();
 const statuses: TaskStatus[] = [
@@ -43,8 +50,14 @@ const size = ref(20);
 const load = () =>
   run(
     async () => {
-      if (tab.value === "status")
-        return { health: (await getClosetOps()).data };
+      if (tab.value === "status") {
+        // An older closet may lack the budget route; health still shows without it.
+        const [ops, budget] = await Promise.all([
+          getClosetOps(),
+          getClosetAssistantTokenBudget().catch(() => undefined)
+        ]);
+        return { health: ops.data, tokenBudget: budget?.data };
+      }
       if (tab.value === "tasks")
         return {
           tasks: (
@@ -73,6 +86,7 @@ const load = () =>
     },
     result => {
       health.value = result.health;
+      tokenBudget.value = result.tokenBudget;
       tasks.value = result.tasks;
       logs.value = result.logs;
     }
@@ -214,6 +228,41 @@ onMounted(() => void load());
             }}</el-descriptions-item></el-descriptions
           >
         </el-card>
+        <el-card v-if="tokenBudget" shadow="never"
+          ><template #header
+            ><div class="flex flex-wrap justify-between gap-2">
+              <span>助手 token 预算</span
+              ><span class="text-sm text-[var(--el-text-color-secondary)]"
+                >按北京时间每日重置，下次
+                {{ formatTime(tokenBudget.resetAtMs) }}</span
+              >
+            </div></template
+          >
+          <el-descriptions :column="width < 768 ? 1 : 2" border
+            ><el-descriptions-item label="全站今日已用 / 日限额"
+              >{{ tokens(tokenBudget.site.used) }} /
+              {{ tokenLimit(tokenBudget.site.limit) }}</el-descriptions-item
+            ><el-descriptions-item label="账号默认日限额">{{
+              tokenLimit(tokenBudget.userDefault.limit)
+            }}</el-descriptions-item></el-descriptions
+          >
+          <el-progress
+            v-if="tokenBudget.site.limit > 0"
+            class="mt-3"
+            :percentage="
+              tokenPercent(tokenBudget.site.used, tokenBudget.site.limit)
+            "
+            :status="
+              tokenBudget.site.used >= tokenBudget.site.limit
+                ? 'exception'
+                : undefined
+            "
+          />
+          <p class="mt-3 text-xs text-[var(--el-text-color-secondary)]">
+            限额来自鱼搭部署配置，此处只读；单个账号的覆盖值在业务用户详情的“AI
+            额度”中设置。
+          </p></el-card
+        >
         <el-card shadow="never"
           ><template #header>索引与队列</template
           ><el-table

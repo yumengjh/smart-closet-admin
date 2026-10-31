@@ -25,6 +25,7 @@ export type NavigationMenu = {
     | "sql-console"
     | "closet-registration"
     | "closet-account-events"
+    | "closet-security-audit"
     | "closet-users"
     | "closet-insights"
     | "closet-dashboard"

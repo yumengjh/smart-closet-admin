@@ -14,6 +14,9 @@ import {
   revokeClosetUserSessions,
   revokePortableLink,
   updateClosetUserQuota,
+  getClosetUserTokenBudget,
+  updateClosetUserTokenBudget,
+  type ClosetTokenBudget,
   updateClosetUserRole,
   updateClosetUserStatus,
   type ClosetSession,
@@ -71,6 +74,8 @@ const quotaForm = reactive<{ image: number; agent: number }>({
   image: 0,
   agent: 0
 });
+const tokenBudget = ref<ClosetTokenBudget>();
+const tokenLimitForm = ref<number>(1);
 
 const load = async () => {
   if (!props.user || !props.modelValue || !can("closet:user:read")) return;
@@ -82,14 +87,17 @@ const load = async () => {
         listClosetUserSessions(username),
         listPortableLinks(username),
         getClosetUserLoginLock(username),
-        getClosetUserEvents(username)
+        getClosetUserEvents(username),
+        // An older closet may lack the token budget route; the rest of the drawer still loads.
+        getClosetUserTokenBudget(username).catch(() => undefined)
       ]),
     ([
       userResponse,
       sessionResponse,
       linkResponse,
       lockResponse,
-      eventResponse
+      eventResponse,
+      budgetResponse
     ]) => {
       if (!props.modelValue || props.user?.username !== username) return;
       detail.value = userResponse.data;
@@ -100,6 +108,12 @@ const load = async () => {
       events.value = eventResponse.data;
       quotaForm.image = detail.value.quota.image.limit;
       quotaForm.agent = detail.value.quota.agent.limit;
+      tokenBudget.value = budgetResponse?.data;
+      // Limit 0 means "no cap"; start the editor from a usable positive value.
+      tokenLimitForm.value =
+        [budgetResponse?.data.limit, budgetResponse?.data.defaultLimit].find(
+          (value): value is number => (value ?? 0) > 0
+        ) ?? 1000000;
     }
   );
 };
@@ -182,6 +196,7 @@ watch(
       links.value = [];
       events.value = [];
       loginLock.value = undefined;
+      tokenBudget.value = undefined;
       displayName.value = "";
     }
   }
@@ -243,6 +258,20 @@ const saveQuota = (restore = false) =>
     undefined,
     "closet:quota:write"
   );
+const saveTokenBudget = (restore = false) =>
+  writeAccount(
+    username =>
+      updateClosetUserTokenBudget(
+        username,
+        restore ? null : tokenLimitForm.value
+      ),
+    restore ? "token 预算已恢复默认" : "token 预算已保存",
+    undefined,
+    "closet:quota:write"
+  );
+const tokens = (value: number) => value.toLocaleString();
+const tokenLimitText = (value: number) =>
+  value > 0 ? tokens(value) : "不设上限";
 const openReport = () => {
   if (!detail.value) return;
   emit("update:modelValue", false);
@@ -679,6 +708,61 @@ const clearTemporaryPassword = () => {
                 @click="saveQuota(true)"
                 >恢复默认</el-button
               >
+            </div>
+            <div v-if="tokenBudget" class="quota-card mt-4">
+              <div class="flex items-center justify-between">
+                <strong>助手 token 日预算</strong>
+                <el-tag
+                  size="small"
+                  :type="tokenBudget.overridden ? 'warning' : 'info'"
+                  >{{ tokenBudget.overridden ? "自定义" : "默认" }}</el-tag
+                >
+              </div>
+              <div class="quota-usage">
+                今日已用 <b>{{ tokens(tokenBudget.used) }}</b> /
+                {{ tokenLimitText(tokenBudget.limit) }}
+                <span class="ml-2 text-xs"
+                  >默认 {{ tokenLimitText(tokenBudget.defaultLimit) }}</span
+                >
+              </div>
+              <el-progress
+                v-if="tokenBudget.limit > 0"
+                :percentage="quotaPercent(tokenBudget.used, tokenBudget.limit)"
+                :status="
+                  tokenBudget.used >= tokenBudget.limit
+                    ? 'exception'
+                    : undefined
+                "
+                :show-text="false"
+              />
+              <p class="mt-2 text-xs text-[var(--el-text-color-secondary)]">
+                输入加输出
+                token，超出后该用户的助手消息会被拒绝；覆盖值立即生效。
+              </p>
+              <label class="quota-limit">
+                <span>每日上限（token）</span>
+                <el-input-number
+                  v-model="tokenLimitForm"
+                  :min="1"
+                  :max="1000000000"
+                  :step="100000"
+                  controls-position="right"
+                  :disabled="saving || !can('closet:quota:write')"
+                />
+              </label>
+              <div v-if="can('closet:quota:write')" class="mt-4 flex gap-2">
+                <el-button
+                  type="primary"
+                  :loading="saving"
+                  @click="saveTokenBudget()"
+                  >保存 token 预算</el-button
+                >
+                <el-button
+                  :disabled="saving || !tokenBudget.overridden"
+                  @click="saveTokenBudget(true)"
+                  >恢复默认</el-button
+                >
+              </div>
             </div>
           </el-tab-pane>
 

@@ -203,6 +203,48 @@ export type StyleTermBatchResult = {
   failed: number;
   results: Array<StyleTermTarget & { ok: boolean; code?: string }>;
 };
+export type SiteTokenBudget = {
+  site: { limit: number; used: number };
+  userDefault: { limit: number };
+  resetAtMs: number;
+};
+export type SecurityAuditCategory =
+  | "AUTH"
+  | "ACCESS"
+  | "ACCOUNT"
+  | "INVITE"
+  | "ASSISTANT"
+  | "MANAGEMENT"
+  | "MODEL";
+export type SecurityAuditItem = {
+  id: string;
+  occurredAtMs: number;
+  category: SecurityAuditCategory;
+  source:
+    | "ACCOUNT_EVENT"
+    | "MANAGEMENT_LOG"
+    | "MODEL_USAGE"
+    | "GENERATION_ATTEMPT";
+  type: string;
+  subject: string;
+  actor: string;
+  result?: string | null;
+  detail?: string | null;
+};
+export type SecurityAuditIntegrity = {
+  status: "INTACT" | "TAMPERED" | "EMPTY";
+  sealedDays: number;
+  verifiedDays: number;
+  expiredDays: number;
+  unsealedDays: number;
+  latestDay?: string | null;
+  latestDigest?: string | null;
+  problems: Array<{
+    day: string;
+    kind: "ROWS_MODIFIED" | "CHAIN_BROKEN" | "DIGEST_ALTERED";
+    message: string;
+  }>;
+};
 const root = "/closet";
 const repeatParams = {
   serialize: (query: Record<string, unknown>) =>
@@ -210,6 +252,30 @@ const repeatParams = {
 };
 export const getClosetOps = () =>
   http.request<ApiResponse<OpsStatus>>("get", `${root}/ops/status`);
+export const getClosetAssistantTokenBudget = () =>
+  http.request<ApiResponse<SiteTokenBudget>>(
+    "get",
+    `${root}/ops/assistant-token-budget`
+  );
+export const listClosetSecurityAudit = (params: {
+  from?: string;
+  to?: string;
+  username?: string;
+  category?: SecurityAuditCategory;
+  type?: string;
+  page: number;
+  size: number;
+}) =>
+  http.request<ApiResponse<Page<SecurityAuditItem>>>(
+    "get",
+    `${root}/security-audit`,
+    { params }
+  );
+export const checkClosetSecurityAuditIntegrity = () =>
+  http.request<ApiResponse<SecurityAuditIntegrity>>(
+    "get",
+    `${root}/security-audit/integrity`
+  );
 export const getClosetTasks = (params: {
   status?: TaskStatus[];
   kind?: string;

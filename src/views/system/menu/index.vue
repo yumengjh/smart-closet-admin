@@ -361,13 +361,16 @@ onMounted(async () => {
               value="account-security" />
             <el-option label="注册与邀请" value="closet-registration" />
             <el-option label="账号审计" value="closet-account-events" />
+            <el-option label="安全审计" value="closet-security-audit" />
             <el-option label="鱼搭业务用户" value="closet-users" />
             <el-option label="衣柜洞察" value="closet-insights" />
             <el-option label="业务大屏" value="closet-dashboard" />
             <el-option label="运行监控" value="closet-ops" />
             <el-option label="数据导出" value="closet-exports" />
             <el-option label="模板审核" value="closet-templates" />
-            <el-option label="风格词审核" value="closet-style-terms" /></el-select
+            <el-option
+              label="风格词审核"
+              value="closet-style-terms" /></el-select
         ></el-form-item>
         <el-form-item label="图标"
           ><el-input v-model="form.icon" placeholder="例如 ri/menu-line"
