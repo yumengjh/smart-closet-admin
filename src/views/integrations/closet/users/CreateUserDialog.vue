@@ -20,6 +20,25 @@ const form = reactive<{
   role: ClosetRole;
   password: string;
 }>({ username: "", displayName: "", role: "USER", password: "" });
+// 与鱼搭一致（smart-closet-server #155、#181）：至少 12 个字符，UTF-8 编码后不超过 72 字节（BCrypt 上限）；留空则生成临时密码
+const PASSWORD_MIN_CHARS = 12;
+const PASSWORD_MAX_BYTES = 72;
+function checkPassword(
+  _rule: unknown,
+  value: string,
+  callback: (error?: Error) => void
+) {
+  if (!value) return callback();
+  if ([...value].length < PASSWORD_MIN_CHARS)
+    return callback(new Error("密码至少需要 12 个字符。"));
+  if (new TextEncoder().encode(value).length > PASSWORD_MAX_BYTES)
+    return callback(
+      new Error(
+        "密码不能超过 72 字节（英文、数字和符号各占 1 字节，汉字通常占 3 字节，表情符号占 4 字节）。"
+      )
+    );
+  callback();
+}
 const rules = {
   username: [
     { required: true, message: "请输入用户名", trigger: "blur" },
@@ -29,9 +48,7 @@ const rules = {
       trigger: "blur"
     }
   ],
-  password: [
-    { min: 12, max: 200, message: "密码需为 12–200 个字符", trigger: "blur" }
-  ]
+  password: [{ validator: checkPassword, trigger: "blur" }]
 };
 watch(
   () => props.modelValue,
@@ -103,7 +120,7 @@ const submit = async () => {
           type="password"
           show-password
           autocomplete="new-password"
-          placeholder="留空则生成一次性临时密码"
+          placeholder="留空则生成一次性临时密码；12 个字符起，最多 72 字节"
         />
       </el-form-item>
     </el-form>
