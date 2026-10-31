@@ -83,6 +83,13 @@ export type ClosetQuota = {
   agent: ClosetQuotaItem;
   resetAtMs: number;
 };
+export type ClosetTokenBudget = {
+  limit: number;
+  used: number;
+  overridden: boolean;
+  defaultLimit: number;
+  resetAtMs: number;
+};
 export type CredentialResult = {
   username: string;
   temporaryPassword: string | null;
@@ -158,6 +165,20 @@ export const updateClosetUserQuota = (
     "put",
     `${root}/${encodeURIComponent(username)}/quota`,
     { data }
+  );
+export const getClosetUserTokenBudget = (username: string) =>
+  http.request<ApiResponse<ClosetTokenBudget>>(
+    "get",
+    `${root}/${encodeURIComponent(username)}/token-budget`
+  );
+export const updateClosetUserTokenBudget = (
+  username: string,
+  dailyTokenLimit: number | null
+) =>
+  http.request<ApiResponse<ClosetTokenBudget>>(
+    "put",
+    `${root}/${encodeURIComponent(username)}/token-budget`,
+    { data: { dailyTokenLimit } }
   );
 
 export const updateClosetUserProfile = (

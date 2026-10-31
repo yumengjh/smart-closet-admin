@@ -46,6 +46,12 @@ const rules = {
       pattern: /^[A-Za-z0-9_.-]{2,80}$/,
       message: "使用 2–80 位字母、数字、点、下划线或短横线",
       trigger: "blur"
+    },
+    {
+      // 与鱼搭 #164 一致：不能只由点组成，也不能含连续的点（会变成 URL 点段）
+      pattern: /^(?!.*\.\.)/,
+      message: "用户名不能只由点组成，也不能包含连续的点",
+      trigger: "blur"
     }
   ],
   password: [{ validator: checkPassword, trigger: "blur" }]

@@ -34,11 +34,18 @@ const definitions = {
       "创建账号、管理状态、角色和会话。"
     ],
     "closet:user:reset-password": ["重置鱼搭密码", "生成一次性临时密码。"],
-    "closet:quota:write": ["调整鱼搭额度", "修改图片与助手每日额度。"],
+    "closet:quota:write": [
+      "调整鱼搭额度",
+      "修改图片、助手每日额度与助手 token 日预算。"
+    ],
     "closet:insights:read": ["查看鱼搭洞察", "读取衣柜、推荐与 AI 指标。"],
     "closet:ops:read": [
       "查看鱼搭运行监控",
-      "只读健康状态、后台任务和操作日志。"
+      "只读健康状态、后台任务、操作日志和助手 token 预算。"
+    ],
+    "closet:security:read": [
+      "查看鱼搭安全审计",
+      "读取安全审计时间线并执行防篡改校验。"
     ],
     "closet:dashboard:read": ["查看鱼搭大屏", "读取汇总业务快照。"],
     "closet:exports:read": ["导出鱼搭数据", "读取按天宽表和去标识事件。"],
@@ -62,6 +69,7 @@ const definitions = {
     "account-security": ["账户安全", "个人账户与会话安全页面组件。"],
     "closet-registration": ["注册与邀请", "注册模式与邀请码管理。"],
     "closet-account-events": ["账号审计", "鱼搭账号事件查询。"],
+    "closet-security-audit": ["安全审计", "鱼搭安全审计时间线与防篡改校验。"],
     "closet-users": ["鱼搭业务用户", "鱼搭业务账号管理。"],
     "closet-insights": ["衣柜洞察", "衣柜、推荐与 AI 用量。"],
     "closet-dashboard": ["业务大屏", "汇总业务趋势与分布。"],
