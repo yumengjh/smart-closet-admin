@@ -46,7 +46,14 @@ export type OperationLog = {
 export type OpsStatus = {
   status: string;
   issues: Array<{ code: string; message: string }>;
-  app: { version: string; startedAtMs: number; uptimeMs: number; java: string };
+  app: {
+    version: string;
+    buildVersion?: string;
+    commit?: string;
+    startedAtMs: number;
+    uptimeMs: number;
+    java: string;
+  };
   jvm: {
     heapUsedBytes: number;
     heapMaxBytes: number;

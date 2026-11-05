@@ -33,6 +33,7 @@ export type NavigationMenu = {
     | "closet-exports"
     | "closet-templates"
     | "closet-style-terms"
+    | "closet-tryon"
     | null;
   icon: string | null;
   sortOrder: number;

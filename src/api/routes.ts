@@ -28,6 +28,7 @@ export type NavigationRoute = {
     | "closet-exports"
     | "closet-templates"
     | "closet-style-terms"
+    | "closet-tryon"
     | null;
   title: string;
   icon: string | null;

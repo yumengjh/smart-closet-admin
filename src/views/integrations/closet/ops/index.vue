@@ -186,8 +186,14 @@ onMounted(() => void load());
             :closable="false"
           />
           <el-descriptions :column="width < 768 ? 1 : 2" border
-            ><el-descriptions-item label="版本">{{
+            ><el-descriptions-item label="包版本">{{
               health.app.version
+            }}</el-descriptions-item
+            ><el-descriptions-item label="发版版本">{{
+              health.app.buildVersion || "未提供"
+            }}</el-descriptions-item
+            ><el-descriptions-item label="提交号">{{
+              health.app.commit || "未提供"
             }}</el-descriptions-item
             ><el-descriptions-item label="运行时长"
               >{{

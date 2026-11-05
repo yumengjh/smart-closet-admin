@@ -311,10 +311,22 @@ onMounted(load);
               dateTime(row.createdAtMs)
             }}</template>
           </el-table-column>
-          <el-table-column label="" width="72" fixed="right" align="right">
+          <el-table-column label="操作" width="150" fixed="right" align="right">
             <template #default="{ row }"
               ><el-button link type="primary" @click.stop="openDetail(row)"
                 >详情</el-button
+              >
+              <el-button
+                v-if="can('closet:tryon:read')"
+                link
+                type="primary"
+                @click.stop="
+                  $router.push({
+                    path: '/closet/tryon',
+                    query: { username: row.username }
+                  })
+                "
+                >试穿策略</el-button
               ></template
             >
           </el-table-column>

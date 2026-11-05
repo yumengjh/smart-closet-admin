@@ -1,10 +1,12 @@
 openapi: 3.1.0
 info:
   title: Smart Closet Management API
-  version: 1.0.0
+  version: 1.2.0
   description: |
     鱼搭中立管理接口。默认关闭（`closet.management.enabled=false`），开启后供任意宿主平台以服务身份调用。
-    设计说明见 `docs/design/2026-10-07-管理平台接入与可插拔管理接口设计.md`。
+    设计说明见 `docs/design/2026-10-07-管理平台接入与可插拔管理接口设计.md`；1.1（运维、KPI、大屏与数据出口、模板审核）见
+    `docs/design/2026-10-09-管理接口二期：运维、KPI与大屏数据设计.md`；1.2（注册、邀请码、账号事件与资料字段）见
+    `docs/design/2026-10-19-用户账号：注册、资料与管理设计.md`。
 
     认证：每个请求都必须携带 HMAC 签名头（见 `components.securitySchemes.closetHmac`）。
     时间字段均为 Unix 毫秒，字段名以 `AtMs` 结尾；日期参数为 `YYYY-MM-DD`，按 Asia/Shanghai 解释，`to` 含当天。
@@ -17,17 +19,31 @@ security:
   - closetHmac: []
 tags:
   - name: users
+  - name: registration
+    description: 注册模式（只读，来自部署配置）与邀请码
   - name: insights
+  - name: ops
+    description: 运维状态、后台任务、管理操作日志（只读）
+  - name: dashboard
+    description: 大屏快照（只含汇总，不含用户名）
+  - name: exports
+    description: 数仓出口：按天宽表与去标识明细事件
+  - name: templates
+    description: 搭配模板审核
+  - name: style-terms
+    description: 助手学到的风格词审核（不含用户名，只给提出人数）
 paths:
   /users:
     get:
       tags: [users]
       operationId: listUsers
       parameters:
-        - { name: q, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: q, in: query, description: 用户名或昵称包含（忽略大小写）, schema: { type: string, maxLength: 80 } }
         - { name: status, in: query, schema: { type: string, enum: [ENABLED, DISABLED] } }
         - { name: role, in: query, schema: { $ref: '#/components/schemas/Role' } }
-        - { name: sort, in: query, schema: { type: string, enum: [createdAt, username, lastActiveAt], default: createdAt } }
+        - { name: registeredVia, in: query, schema: { type: string, enum: [ADMIN, INVITE, OPEN] } }
+        - { name: deactivated, in: query, description: true 只看自助注销的账号，false 排除, schema: { type: boolean } }
+        - { name: sort, in: query, schema: { type: string, enum: [createdAt, username, lastActiveAt, lastLoginAt], default: createdAt } }
         - { name: order, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
@@ -195,6 +211,89 @@ paths:
                   revokedSessions: { type: integer }
         '401': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /users/{username}/profile:
+    parameters: [ { $ref: '#/components/parameters/Username' } ]
+    patch:
+      tags: [users]
+      operationId: updateUserProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [displayName]
+              properties:
+                displayName: { type: string, maxLength: 40, description: 空串清除昵称 }
+      responses:
+        '200':
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [username]
+                properties:
+                  username: { type: string }
+                  displayName: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /users/{username}/sessions/{sessionRef}:
+    parameters:
+      - $ref: '#/components/parameters/Username'
+      - { name: sessionRef, in: path, required: true, schema: { type: string, pattern: '^[0-9a-f]{16}$' } }
+    delete:
+      tags: [users]
+      operationId: revokeUserSession
+      description: 退出单个会话，`sessionRef` 取自 GET /users/{username}/sessions。
+      responses:
+        '204': { description: 已退出 }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /users/{username}/login-lock:
+    parameters: [ { $ref: '#/components/parameters/Username' } ]
+    get:
+      tags: [users]
+      operationId: getUserLoginLock
+      description: 该用户名当前 15 分钟窗口内的登录失败与锁定情况（按来源地址的限制不属于单个用户，不在此显示）。
+      responses:
+        '200':
+          description: 登录锁定状态
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginLock' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [users]
+      operationId: clearUserLoginLock
+      description: 解除锁定（清空该用户名的失败计数），返回解除后的状态。
+      responses:
+        '200':
+          description: 已解除
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginLock' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /users/{username}/events:
+    parameters: [ { $ref: '#/components/parameters/Username' } ]
+    get:
+      tags: [users]
+      operationId: listUserEvents
+      description: 最近 50 条账号事件（注册、登录成功、改密码、改资料、退出设备、注销，以及鱼搭管理员与管理接口的操作），新的在前；保留 180 天。
+      responses:
+        '200':
+          description: 账号事件
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AccountEvent' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /users/{username}/portable-links:
     parameters: [ { $ref: '#/components/parameters/Username' } ]
     get:
@@ -258,6 +357,273 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /users/{username}/token-budget:
+    parameters: [ { $ref: '#/components/parameters/Username' } ]
+    get:
+      tags: [users]
+      operationId: getUserTokenBudget
+      description: 助手 token 日预算与当日用量（输入加输出 token，北京时间自然日）。限额超出后，用户发起的助手消息返回 429 `AGENT_TOKEN_BUDGET_EXCEEDED`。
+      responses:
+        '200':
+          description: 今日 token 预算
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenBudget' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    put:
+      tags: [users]
+      operationId: updateUserTokenBudget
+      description: '`dailyTokenLimit` 为 `null` 表示恢复默认限额（`CLOSET_AGENT_USER_TOKEN_DAILY_LIMIT`，默认 3000000；默认值为 0 表示不设上限）。覆盖值立即生效。'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [dailyTokenLimit]
+              properties:
+                dailyTokenLimit: { type: [integer, 'null'], format: int64, minimum: 1, maximum: 1000000000 }
+      responses:
+        '200':
+          description: 已更新
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenBudget' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /registration:
+    get:
+      tags: [registration]
+      operationId: getRegistration
+      description: 生效模式 = 管理覆盖值（若有）否则部署配置 `CLOSET_REGISTRATION`。
+      responses:
+        '200':
+          description: 注册模式
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistrationState' }
+        '401': { $ref: '#/components/responses/Problem' }
+    put:
+      tags: [registration]
+      operationId: setRegistration
+      description: 覆盖注册模式，立即生效；`mode` 为 null 或缺省则删除覆盖，回到部署配置。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                mode: { type: [string, 'null'], enum: [CLOSED, INVITE, OPEN, null] }
+      responses:
+        '200':
+          description: 修改后的状态
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistrationState' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /invites:
+    get:
+      tags: [registration]
+      operationId: listInvites
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [ACTIVE, USED_UP, EXPIRED, REVOKED] } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 邀请码分页，新的在前（不含明文）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, size]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Invite' } }
+                  total: { type: integer, format: int64 }
+                  page: { type: integer }
+                  size: { type: integer }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [registration]
+      operationId: createInvite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: { type: [string, 'null'], maxLength: 100 }
+                maxUses: { type: [integer, 'null'], minimum: 1, maximum: 100, default: 1 }
+                expiresInDays: { type: [integer, 'null'], minimum: 1, maximum: 90, default: 7 }
+      responses:
+        '201':
+          description: 已创建；`code` 只在本响应出现一次，调用方不得记录到日志
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Invite'
+                  - type: object
+                    required: [code]
+                    properties:
+                      code: { type: string, example: 'K7QM-2XPA-9WDE' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /invites/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, maxLength: 36 } }
+    get:
+      tags: [registration]
+      operationId: getInvite
+      responses:
+        '200':
+          description: 邀请码及用它注册的账号
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [invite, registeredUsers]
+                properties:
+                  invite: { $ref: '#/components/schemas/Invite' }
+                  registeredUsers:
+                    type: array
+                    items:
+                      type: object
+                      required: [username, createdAtMs, enabled]
+                      properties:
+                        username: { type: string }
+                        createdAtMs: { type: integer, format: int64 }
+                        enabled: { type: boolean }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    patch:
+      tags: [registration]
+      operationId: updateInvite
+      description: 至少一个字段；`note` 空串清除；`maxUses` 不能低于已用次数；`expiresAtMs` 需在现在之后 90 天以内。已撤销的邀请码不能修改（409 INVITE_REVOKED）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: { type: [string, 'null'], maxLength: 100 }
+                maxUses: { type: [integer, 'null'], minimum: 1, maximum: 100 }
+                expiresAtMs: { type: [integer, 'null'], format: int64 }
+      responses:
+        '200':
+          description: 已更新
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invite' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [registration]
+      operationId: revokeInvite
+      responses:
+        '204': { description: 已撤销（重复撤销仍为 204） }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /account-events:
+    get:
+      tags: [users]
+      operationId: listAccountEvents
+      description: 全站账号事件（注册、登录成功与失败、锁定、越权拒绝、邀请码、改密码、改资料、退出设备、注销、鱼搭管理员与管理接口操作），新的在前，保留期由 closet.audit.retention-days 配置（默认 180 天）。
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - { name: username, in: query, schema: { type: string, pattern: '^[A-Za-z0-9_.-]{2,80}$' } }
+        - { name: action, in: query, schema: { type: string, pattern: '^[A-Z_]{1,48}$' } }
+        - { name: actor, in: query, schema: { type: string, maxLength: 200 } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 账号事件分页
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, size]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/AccountEvent'
+                        - type: object
+                          required: [id, username]
+                          properties:
+                            id: { type: string }
+                            username: { type: string }
+                  total: { type: integer, format: int64 }
+                  page: { type: integer }
+                  size: { type: integer }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /security-audit:
+    get:
+      tags: [users]
+      operationId: listSecurityAudit
+      description: >-
+        统一安全审计时间线，新的在前：合并账号事件（含登录失败、锁定、越权拒绝、邀请码、助手危险操作）、管理接口操作日志与模型调用明细
+        （model_usage 与 generation_attempt：谁、何时、哪个模型、什么用途、成功 / 失败 / UNKNOWN，不含提示词与内容）。
+        只读运维出口；明细含用户名，接入方不得转入大屏或数仓。登录失败的 subject 是登录名的单向键（~ 加 16 位十六进制，服务端密钥 HMAC），按 username 筛选时同时匹配该键（含旧版无密钥键）。
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - { name: username, in: query, schema: { type: string, pattern: '^[A-Za-z0-9_.-]{2,80}$' } }
+        - { name: category, in: query, schema: { type: string, enum: [AUTH, ACCESS, ACCOUNT, INVITE, ASSISTANT, MANAGEMENT, MODEL] } }
+        - { name: type, in: query, description: '事件类型原文，如 LOGIN_FAILED、MODEL_CALL、MODEL_ATTEMPT 或管理操作名', schema: { type: string, pattern: '^[A-Za-z0-9_]{1,64}$' } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 安全审计事件分页
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, size]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/SecurityAuditItem' }
+                  total: { type: integer, format: int64 }
+                  page: { type: integer }
+                  size: { type: integer }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /security-audit/integrity:
+    get:
+      tags: [users]
+      operationId: checkSecurityAuditIntegrity
+      description: >-
+        防篡改校验：先封存尚未封存的已结束日（按北京时间），再重算每日摘要链（account_event 与 management_operation_log 的当日记录的 SHA-256，
+        并链接前一日摘要），保留期内的日子同时重算记录本身。status 为 INTACT（完整）、TAMPERED（problems 指出被改动的日期与类型）或 EMPTY（尚无已封存的日子）。
+        摘要永久保留，超过保留期的日子只校验摘要链（expiredDays）。
+      responses:
+        '200':
+          description: 校验结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecurityAuditIntegrity' }
+        '401': { $ref: '#/components/responses/Problem' }
   /insights/overview:
     get:
       tags: [insights]
@@ -319,18 +685,320 @@ paths:
           schema:
             type: array
             minItems: 1
-            maxItems: 7
+            maxItems: 15
             items: { $ref: '#/components/schemas/TrendMetric' }
-        - { name: granularity, in: query, schema: { type: string, enum: [day, week], default: day } }
+        - { name: granularity, in: query, schema: { type: string, enum: [day, week, month], default: day } }
       responses:
         '200':
-          description: 时间序列（空桶补 0，周以周一为起点）
+          description: 时间序列（空桶补 0，周以周一为起点，月以 1 日为起点；active_users 按桶去重）
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Trends' }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /insights/recommendations:
+    get:
+      tags: [insights]
+      operationId: insightRecommendations
+      description: 推荐效果 KPI。采用＝点赞、在搭台打开，或展示后 3 天内打卡穿过这一套的全部衣物（按用户分别匹配后汇总）。
+      parameters:
+        - $ref: '#/components/parameters/ScopeUsername'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: 推荐效果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecommendationKpi' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /insights/ai:
+    get:
+      tags: [insights]
+      operationId: insightAi
+      description: 模型与额度用量（只给 token 数，费用由接入方按单价换算）。不传 username 时附 token 用量 Top 10 用户。
+      parameters:
+        - $ref: '#/components/parameters/ScopeUsername'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: 模型用量
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiUsage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /ops/status:
+    get:
+      tags: [ops]
+      operationId: opsStatus
+      description: 运维总览。status 为 UP 或 DEGRADED，issues 给出原因代码与说明；不含密钥、服务商地址、用户名。
+      responses:
+        '200':
+          description: 运维状态
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpsStatus' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /ops/assistant-token-budget:
+    get:
+      tags: [ops]
+      operationId: opsAssistantTokenBudget
+      description: 助手 token 预算总览（只读）：全站今日用量与限额、账号默认限额。限额来自部署配置，不能通过接口修改；单个账号的覆盖值见 `/users/{username}/token-budget`。
+      responses:
+        '200':
+          description: 全站 token 预算
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteTokenBudget' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /ops/tasks:
+    get:
+      tags: [ops]
+      operationId: opsTasks
+      parameters:
+        - name: status
+          in: query
+          style: form
+          explode: true
+          description: 默认 FAILED
+          schema:
+            type: array
+            items: { type: string, enum: [QUEUED, RUNNING, WAITING_QUOTA, CANCEL_REQUESTED, SUCCEEDED, FAILED, UNKNOWN, INTERRUPTED, CANCELLED] }
+        - { name: kind, in: query, schema: { type: string, pattern: '^[A-Z_]{1,40}$' } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 后台任务（不含载荷）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /ops/operation-log:
+    get:
+      tags: [ops]
+      operationId: opsOperationLog
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - { name: action, in: query, schema: { type: string, maxLength: 64 } }
+        - { name: targetUsername, in: query, schema: { type: string, pattern: '^[A-Za-z0-9_.-]{2,80}$' } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 管理接口操作日志
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperationLogPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /dashboard/snapshot:
+    get:
+      tags: [dashboard]
+      operationId: dashboardSnapshot
+      description: 大屏一次拿全。缓存 15 秒，建议按 refreshAfterMs 轮询。只含汇总，不含用户名、衣物名称或图片。
+      responses:
+        '200':
+          description: 大屏快照
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardSnapshot' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /exports/daily:
+    get:
+      tags: [exports]
+      operationId: exportDaily
+      description: 按天宽表，最长 366 天。format=csv 时返回带表头的 UTF-8 CSV。
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - { name: format, in: query, schema: { type: string, enum: [json, csv], default: json } }
+      responses:
+        '200':
+          description: 每天一行
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyExport' }
+            text/csv:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /exports/events:
+    get:
+      tags: [exports]
+      operationId: exportEvents
+      description: |
+        去标识明细事件，按 (atMs, type, id) 排序，用 nextCursor 增量拉取；同一游标重复拉取结果一致。
+        只返回 watermarkMs（当前时间−5 秒）之前的事件。用户只以 userKey（HMAC-SHA256(盐, 用户名) 前 16 位）出现。
+      parameters:
+        - { name: cursor, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: since, in: query, description: 起始毫秒时间戳（含），与 cursor 二选一, schema: { type: integer, format: int64, minimum: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 500 } }
+        - name: types
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/EventType' }
+      responses:
+        '200':
+          description: 一页事件
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /templates:
+    get:
+      tags: [templates]
+      operationId: listTemplates
+      responses:
+        '200':
+          description: 全部搭配模板（资源文件 + 样本生成的草稿）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TemplateList' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /templates/{id}:
+    patch:
+      tags: [templates]
+      operationId: reviewTemplate
+      description: 与鱼搭管理员审核共用存储，立即生效；记操作日志，审核人记为 manage:{keyId}:{X-Operator}。
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_.-]{1,80}$' } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              minProperties: 1
+              properties:
+                reviewStatus: { type: string, enum: [PENDING_REVIEW, APPROVED, REJECTED] }
+                enabled: { type: boolean }
+                bonus: { type: number, minimum: 0, maximum: 5 }
+      responses:
+        '200':
+          description: 审核后的模板
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Template' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /style-terms/pending:
+    get:
+      tags: [style-terms]
+      operationId: listPendingStyleTerms
+      description: 待审核的风格词，按（词，映射）归并；提出次数多的在前。不返回用户名，只给提出人数。
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 待审核风格词分页，附标准风格表（批准时可改映射）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PendingStyleTermPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /style-terms/pending/approve:
+    post:
+      tags: [style-terms]
+      operationId: approveStyleTerm
+      description: 批准该词在该映射下的全部待审核提案（不分提出人）：词进入全站词表，替换已有映射，同映射的其他提案一并关闭。记操作日志 STYLE_TERM_APPROVE。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StyleTermApprove' }
+      responses:
+        '200':
+          description: 已批准
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StyleTermReviewResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /style-terms/pending/reject:
+    post:
+      tags: [style-terms]
+      operationId: rejectStyleTerm
+      description: 驳回该词在该映射下的全部待审核提案：不进全站词表，对提出者本人也不再生效。记操作日志 STYLE_TERM_REJECT。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StyleTermReject' }
+      responses:
+        '200':
+          description: 已驳回
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StyleTermReviewResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /tryon/settings:
+    get: {"summary": "查询试穿设置", "operationId": "tryonGetSettings", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}}
+    put: {"summary": "更新试穿设置", "operationId": "tryonPutSettings", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TryOnSettingsChange"}}}}}
+  /tryon/settings/reset:
+    post: {"summary": "恢复试穿初始设置", "operationId": "tryonPostSettingsReset", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TryOnReset"}}}}}
+  /tryon/users/{username}/policy:
+    get: {"summary": "查询用户试穿策略", "operationId": "tryonGetUsersUsernamePolicy", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "parameters": [{"name": "username", "in": "path", "required": true, "schema": {"type": "string"}}]}
+    put: {"summary": "更新用户试穿策略", "operationId": "tryonPutUsersUsernamePolicy", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "parameters": [{"name": "username", "in": "path", "required": true, "schema": {"type": "string"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TryOnUserPolicy"}}}}}
+  /tryon/users/{username}/usage:
+    get: {"summary": "查询用户试穿用量", "operationId": "tryonGetUsersUsernameUsage", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "parameters": [{"name": "username", "in": "path", "required": true, "schema": {"type": "string"}}]}
+  /tryon/users/{username}/startup-failures/reset:
+    post:
+      summary: 解除指定用户的启动失败重试保护
+      description: 只重置首帧前失败计数基准，不改历史费用、用户时长、预算、会话状态或全局开关；记录管理操作日志。
+      operationId: tryonResetUserStartupFailures
+      parameters:
+        - {name: username, in: path, required: true, schema: {type: string, maxLength: 160}}
+      responses:
+        '200': {description: 重置时间与启动失败保护状态, content: {application/json: {schema: {type: object}}}}
+        '400': {$ref: '#/components/responses/Problem'}
+        '401': {$ref: '#/components/responses/Problem'}
+  /tryon/accounts:
+    get: {"summary": "查询运营账户", "operationId": "tryonGetAccounts", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}}
+    post: {"summary": "登记账户与永久凭证", "operationId": "tryonPostAccounts", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TryOnCredentialInput"}}}}}
+  /tryon/accounts/{id}:
+    get: {"summary": "查询账户概况", "operationId": "tryonGetAccountsId", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}]}
+    patch: {"summary": "调整账户调度", "operationId": "tryonPatchAccountsId", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TryOnAccountChange"}}}}}
+  /tryon/accounts/{id}/credentials:
+    post: {"summary": "轮换同账户永久凭证", "operationId": "tryonPostAccountsIdCredentials", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TryOnCredentialInput"}}}}}
+  /tryon/accounts/{id}/credentials/{credentialId}:
+    delete: {"summary": "停用未被在途引用的凭证", "operationId": "tryonDeleteAccountsIdCredentialsCredentialid", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}, {"name": "credentialId", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}]}
+  /tryon/accounts/{id}/probe:
+    post: {"summary": "只读探测余额与授权", "operationId": "tryonPostAccountsIdProbe", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}]}
+  /tryon/accounts/{id}/budget:
+    post: {"summary": "更新本地累计支出授权", "operationId": "tryonPostAccountsIdBudget", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TryOnBudgetChange"}}}}}
+  /tryon/pool:
+    get: {"summary": "查询总池可用池和并发", "operationId": "tryonGetPool", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}}
+  /tryon/reference-source:
+    get: {"summary": "查询试穿参考图来源（试穿专用存储桶、本站公网站点或仅限本地开发的 XMax 存储）与各状态参考图记录数", "operationId": "tryonGetReferenceSource", "responses": {"200": {"description": "来源、devOnly、桶主机名/桶名/前缀或站点 origin、地址有效期与记录计数；不含访问密钥、令牌或图片地址", "content": {"application/json": {"schema": {}}}}}}
+  /tryon/usage:
+    get: {"summary": "查询试穿成本汇总", "operationId": "tryonGetUsage", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}}
+  /tryon/sessions:
+    get: {"summary": "查询会话与待回收记录", "operationId": "tryonGetSessions", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}}
+  /tryon/sessions/{id}:
+    get: {"summary": "查询单次会话", "operationId": "tryonGetSessionsId", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}]}
+  /tryon/sessions/{id}/stop:
+    post: {"summary": "紧急停止单次会话", "operationId": "tryonPostSessionsIdStop", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}]}
+  /tryon/accounts/{id}/stop-sessions:
+    post: {"summary": "紧急停止账户在途会话", "operationId": "tryonPostAccountsIdStopSessions", "responses": {"200": {"description": "操作结果；不含永久密钥与私人媒体内容", "content": {"application/json": {"schema": {}}}}}, "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}]}
 components:
   securitySchemes:
     closetHmac:
@@ -390,13 +1058,21 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
   schemas:
+    TryOnSettingsValue: {"type": "object", "additionalProperties": false, "required": ["mode", "defaultEnabled", "dailySeconds", "dailyPoints", "totalPoints", "sessionSeconds", "startupSeconds", "firstFrameSeconds", "queueSeconds", "offerSeconds", "recordingSeconds", "recordingBytes", "storageBytes", "accountConcurrency", "accountGuardPoints"], "properties": {"mode": {"type": "string", "enum": ["FORCE_OFF", "FORCE_ON", "FOLLOW_USER"]}, "defaultEnabled": {"type": "boolean"}, "dailySeconds": {"type": "integer", "minimum": 0, "maximum": 86400}, "dailyPoints": {"type": "integer", "minimum": 0, "maximum": 1000000000}, "totalPoints": {"type": "integer", "minimum": 0, "maximum": 1000000000000}, "sessionSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}, "startupSeconds": {"type": "integer", "minimum": 1, "maximum": 120}, "firstFrameSeconds": {"type": "integer", "minimum": 1, "maximum": 120}, "queueSeconds": {"type": "integer", "minimum": 1, "maximum": 600}, "offerSeconds": {"type": "integer", "minimum": 1, "maximum": 60}, "recordingSeconds": {"type": "integer", "minimum": 1, "maximum": 600}, "recordingBytes": {"type": "integer", "minimum": 1024, "maximum": 536870912}, "storageBytes": {"type": "integer", "minimum": 0, "maximum": 1099511627776}, "accountConcurrency": {"type": "integer", "minimum": 1, "maximum": 100}, "accountGuardPoints": {"type": "integer", "minimum": 0, "maximum": 3600}}}
+    TryOnSettingsChange: {"type": "object", "additionalProperties": false, "required": ["revision", "value"], "properties": {"revision": {"type": "integer", "minimum": 0}, "value": {"$ref": "#/components/schemas/TryOnSettingsValue"}}}
+    TryOnReset: {"type": "object", "additionalProperties": false, "required": ["revision"], "properties": {"revision": {"type": "integer", "minimum": 0}}}
+    TryOnUserPolicy: {"type": "object", "additionalProperties": false, "required": ["accessMode", "dailySeconds"], "properties": {"accessMode": {"type": "string", "enum": ["INHERIT", "ENABLED", "DISABLED"]}, "dailySeconds": {"type": ["integer", "null"], "minimum": 0, "maximum": 86400}, "startupFailureLimit": {"type": ["integer", "null"], "minimum": 0, "maximum": 999, "description": "每日有费用的首帧前失败上限；null 或省略继承默认 3，0 关闭该用户次数限制。PUT 为完整替换。"}}}
+    TryOnCredentialInput: {"type": "object", "additionalProperties": false, "required": ["name", "environment", "apiKey"], "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 80}, "environment": {"type": "string", "enum": ["china", "global"]}, "apiKey": {"type": "string", "writeOnly": true, "pattern": "^uk-[A-Za-z0-9_-]{8,500}$"}}}
+    TryOnAccountChange: {"type": "object", "additionalProperties": false, "required": ["name", "accepting", "weight", "concurrencyLimit"], "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 80}, "accepting": {"type": "boolean"}, "weight": {"type": "integer", "minimum": 1, "maximum": 100}, "concurrencyLimit": {"type": "integer", "minimum": 1, "maximum": 100}}}
+    TryOnBudgetChange: {"type": "object", "additionalProperties": false, "required": ["budgetPoints"], "properties": {"budgetPoints": {"type": "integer", "minimum": 0, "maximum": 1000000000000}}}
     Role:
       type: string
       enum: [USER, ADMIN]
     OptionalPassword:
       type: [string, 'null']
+      description: 至少 12 个字符，且 UTF-8 编码后不超过 72 字节（BCrypt 上限；汉字通常 3 字节、表情符号 4 字节），超出返回 400 VALIDATION_FAILED，不截断。
       minLength: 12
-      maxLength: 200
+      maxLength: 72
     Problem:
       type: object
       required: [type, title, status, code]
@@ -409,7 +1085,7 @@ components:
           type: string
           enum: [VALIDATION_FAILED, MALFORMED_JSON, MANAGEMENT_SIGNATURE_MISSING, MANAGEMENT_KEY_UNKNOWN,
                  MANAGEMENT_TIMESTAMP_SKEWED, MANAGEMENT_SIGNATURE_INVALID, MANAGEMENT_REPLAYED, USER_NOT_FOUND,
-                 PORTABLE_LINK_NOT_FOUND, USER_ALREADY_EXISTS, LAST_ADMIN_PROTECTED, PAYLOAD_TOO_LARGE,
+                 PORTABLE_LINK_NOT_FOUND, SESSION_NOT_FOUND, INVITE_NOT_FOUND, INVITE_REVOKED, USER_ALREADY_EXISTS, LAST_ADMIN_PROTECTED, PAYLOAD_TOO_LARGE,
                  MANAGEMENT_BUSY, INTERNAL_ERROR]
         requestId: { type: string }
         violations:
@@ -433,6 +1109,10 @@ components:
         activeSessionCount: { type: integer }
         garmentCount: { type: integer, description: 仅 ACTIVE }
         outfitCount: { type: integer }
+        displayName: { type: [string, 'null'], description: 昵称，未设置为 null }
+        registeredVia: { type: string, enum: [ADMIN, INVITE, OPEN], description: 账号来源 }
+        lastLoginAtMs: { type: [integer, 'null'], format: int64, description: 最近一次密码登录或注册时间 }
+        deactivatedAtMs: { type: [integer, 'null'], format: int64, description: 用户自助注销时间；重新启用后清空 }
     UserPage:
       type: object
       required: [items, total, page, size]
@@ -463,14 +1143,21 @@ components:
         hasWearerProfile: { type: boolean }
         activePortableLinkCount: { type: integer }
         quota: { $ref: '#/components/schemas/Quota' }
+        inviteId: { type: [string, 'null'], description: 注册时使用的邀请码 id }
+        loginLock: { $ref: '#/components/schemas/LoginLock' }
+        displayName: { type: [string, 'null'], description: 昵称，未设置为 null }
+        registeredVia: { type: string, enum: [ADMIN, INVITE, OPEN], description: 账号来源 }
+        lastLoginAtMs: { type: [integer, 'null'], format: int64, description: 最近一次密码登录或注册时间 }
+        deactivatedAtMs: { type: [integer, 'null'], format: int64, description: 用户自助注销时间；重新启用后清空 }
     CreateUserRequest:
       type: object
       additionalProperties: false
       required: [username, role]
       properties:
-        username: { type: string, pattern: '^[A-Za-z0-9_.-]{2,80}$' }
+        username: { type: string, pattern: '^(?!.*\.\.)[A-Za-z0-9_.-]{2,80}$', description: 新用户名不能包含连续的点（如 `..`），否则无法作为路径段寻址；已有账号的查询仍按路径参数的旧规则匹配 }
         role: { $ref: '#/components/schemas/Role' }
         password: { $ref: '#/components/schemas/OptionalPassword' }
+        displayName: { type: [string, 'null'], maxLength: 40, description: 昵称，可省略；首尾空白会去掉，空白视为未设置，最多 40 个字符（按 Unicode 字符计），不得含控制字符，否则返回 400 VALIDATION_FAILED }
     CredentialResult:
       type: object
       required: [username, temporaryPassword]
@@ -488,6 +1175,80 @@ components:
         lastAccessAtMs: { type: integer, format: int64 }
         expiresAtMs: { type: integer, format: int64 }
         portable: { type: boolean }
+    LoginLock:
+      type: object
+      required: [locked, recentFailures, retryAfterSeconds]
+      properties:
+        locked: { type: boolean }
+        recentFailures: { type: integer, description: 15 分钟内失败次数 }
+        retryAfterSeconds: { type: integer, description: 锁定剩余秒数，未锁定为 0 }
+    RegistrationState:
+      type: object
+      required: [mode, configuredMode, overridden, activeInviteCount]
+      properties:
+        mode: { type: string, enum: [CLOSED, INVITE, OPEN], description: 当前生效模式 }
+        configuredMode: { type: string, enum: [CLOSED, INVITE, OPEN], description: 部署配置 CLOSET_REGISTRATION }
+        overridden: { type: boolean }
+        updatedBy: { type: [string, 'null'] }
+        updatedAtMs: { type: [integer, 'null'], format: int64 }
+        activeInviteCount: { type: integer }
+    AccountEvent:
+      type: object
+      required: [occurredAtMs, actor, action]
+      properties:
+        occurredAtMs: { type: integer, format: int64 }
+        actor: { type: string, description: '操作者：用户名本人、鱼搭管理员用户名或 manage:{keyId}[:{X-Operator}]' }
+        action:
+          type: string
+          description: REGISTERED、LOGIN_SUCCEEDED、LOGIN_FAILED / LOGIN_LOCKED / PASSWORD_CONFIRM_FAILED / PORTABLE_LOGIN_FAILED（username 为登录名的单向键 ~xxxxxxxxxxxxxxxx，不含口令、IP、UA）、ACCESS_DENIED / CSRF_REJECTED / MANAGE_AUTH_REJECTED（detail 为方法、路径模板、角色）、INVITE_CREATED / INVITE_REVOKED / INVITE_USED / INVITE_REJECTED（只含邀请码 id）、PASSWORD_CHANGED、PROFILE_UPDATED、SESSIONS_REVOKED、DEACTIVATED、ADMIN_*（鱼搭内管理员）、MANAGE_*（管理接口）、AGENT_COMMAND（助手触发的危险操作：批量或单件回收、修改个人资料、删除基准人物或 OOTD、记忆维护；detail 含 event、kind、命令 id、会话与请求 id，不含内容）
+        detail: { type: [string, 'null'] }
+    SecurityAuditIntegrity:
+      type: object
+      required: [status, sealedDays, verifiedDays, expiredDays, unsealedDays, problems]
+      properties:
+        status: { type: string, enum: [INTACT, TAMPERED, EMPTY] }
+        sealedDays: { type: integer }
+        verifiedDays: { type: integer, description: '保留期内、记录与摘要都已核对的天数' }
+        expiredDays: { type: integer, description: '记录已按保留期清理、只核对摘要链的天数' }
+        unsealedDays: { type: integer, description: '最后封存日之后、尚未封存的已结束日数' }
+        latestDay: { type: [string, 'null'], format: date }
+        latestDigest: { type: [string, 'null'] }
+        problems:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            required: [day, kind, message]
+            properties:
+              day: { type: string, format: date }
+              kind: { type: string, enum: [ROWS_MODIFIED, CHAIN_BROKEN, DIGEST_ALTERED] }
+              message: { type: string }
+    SecurityAuditItem:
+      type: object
+      required: [id, occurredAtMs, category, source, type, subject, actor]
+      properties:
+        id: { type: string }
+        occurredAtMs: { type: integer, format: int64 }
+        category: { type: string, enum: [AUTH, ACCESS, ACCOUNT, INVITE, ASSISTANT, MANAGEMENT, MODEL] }
+        source: { type: string, enum: [ACCOUNT_EVENT, MANAGEMENT_LOG, MODEL_USAGE, GENERATION_ATTEMPT] }
+        type: { type: string }
+        subject: { type: string, description: '事件所涉账号；登录失败为 ~ 加 16 位单向键；无账号时为 -' }
+        actor: { type: string }
+        result: { type: [string, 'null'], description: '管理操作 SUCCESS / FAILURE；模型调用 OK / UNKNOWN（令牌用量缺失）/ FAILED / CANCELLED，生成尝试为其状态' }
+        detail: { type: [string, 'null'] }
+    Invite:
+      type: object
+      required: [id, maxUses, usedCount, createdBy, createdAtMs, expiresAtMs, status]
+      properties:
+        id: { type: string }
+        note: { type: [string, 'null'] }
+        maxUses: { type: integer }
+        usedCount: { type: integer }
+        createdBy: { type: string }
+        createdAtMs: { type: integer, format: int64 }
+        expiresAtMs: { type: integer, format: int64 }
+        revokedAtMs: { type: [integer, 'null'], format: int64 }
+        status: { type: string, enum: [ACTIVE, USED_UP, EXPIRED, REVOKED] }
     PortableLink:
       type: object
       required: [id, createdAtMs, expiresAtMs, status]
@@ -510,6 +1271,31 @@ components:
       properties:
         image: { $ref: '#/components/schemas/QuotaItem' }
         agent: { $ref: '#/components/schemas/QuotaItem' }
+        resetAtMs: { type: integer, format: int64 }
+    TokenBudget:
+      type: object
+      required: [limit, used, overridden, defaultLimit, resetAtMs]
+      properties:
+        limit: { type: integer, format: int64, description: 当前生效的日限额；0 表示不设上限 }
+        used: { type: integer, format: int64, description: 今日已用 token（输入加输出，未知按 0） }
+        overridden: { type: boolean }
+        defaultLimit: { type: integer, format: int64 }
+        resetAtMs: { type: integer, format: int64 }
+    SiteTokenBudget:
+      type: object
+      required: [site, userDefault, resetAtMs]
+      properties:
+        site:
+          type: object
+          required: [limit, used]
+          properties:
+            limit: { type: integer, format: int64, description: 全站日限额；0 表示不设上限 }
+            used: { type: integer, format: int64 }
+        userDefault:
+          type: object
+          required: [limit]
+          properties:
+            limit: { type: integer, format: int64 }
         resetAtMs: { type: integer, format: int64 }
     Scope:
       type: object
@@ -586,6 +1372,8 @@ components:
         favoriteCount: { type: integer }
         wearingConfirmedCount: { type: integer }
         mappingVersion: { type: string }
+        styles: { type: array, items: { $ref: '#/components/schemas/KeyCount' }, description: 风格标签前 12 项（1.2） }
+        genderFits: { type: array, items: { $ref: '#/components/schemas/KeyCount' }, description: 男款 / 女款 / 中性（1.2） }
     GarmentRef:
       type: object
       required: [garmentId, owner, family, createdAtMs]
@@ -621,12 +1409,13 @@ components:
               usedInOutfits: { type: integer }
     TrendMetric:
       type: string
-      enum: [garments_created, garments_adopted, outfits_created, quick_intakes, image_units, agent_messages, users_created]
+      enum: [garments_created, garments_adopted, outfits_created, quick_intakes, image_units, agent_messages, users_created,
+             active_users, recommendations_shown, recommendation_likes, recommendation_dislikes, wear_logs, model_calls, model_tokens, ootd_samples]
     Trends:
       type: object
       required: [granularity, buckets, series]
       properties:
-        granularity: { type: string, enum: [day, week] }
+        granularity: { type: string, enum: [day, week, month] }
         buckets: { type: array, items: { type: string, format: date } }
         series:
           type: array
@@ -636,3 +1425,276 @@ components:
             properties:
               metric: { $ref: '#/components/schemas/TrendMetric' }
               values: { type: array, items: { type: integer } }
+    Rate:
+      type: [number, 'null']
+      description: 0~1，分母为 0 时为 null
+    AdoptionRow:
+      type: object
+      properties:
+        shown: { type: integer }
+        adopted: { type: integer }
+        adoptionRate: { $ref: '#/components/schemas/Rate' }
+    RecommendationKpi:
+      type: object
+      required: [scope, shown, adopted, adoptionRate, liked, disliked, likeRate, openedInWorkspace, wornWithin3Days, swaps, users, bySource, byRank, templates, daily, definition]
+      properties:
+        scope: { type: object }
+        shown: { type: integer }
+        adopted: { type: integer }
+        adoptionRate: { $ref: '#/components/schemas/Rate' }
+        liked: { type: integer }
+        disliked: { type: integer }
+        likeRate: { $ref: '#/components/schemas/Rate' }
+        openedInWorkspace: { type: integer }
+        wornWithin3Days: { type: integer }
+        swaps: { type: integer }
+        users: { type: integer, description: 范围内收到过推荐的用户数 }
+        bySource: { type: array, items: { allOf: [{ $ref: '#/components/schemas/AdoptionRow' }, { type: object, properties: { source: { type: string, description: 'PAGE 推荐区 / AGENT 助手 / INSPIRATION 今日灵感 / SWAP / MORE' } } }] } }
+        byRank: { type: array, items: { allOf: [{ $ref: '#/components/schemas/AdoptionRow' }, { type: object, properties: { rank: { type: integer } } }] } }
+        templates: { type: array, items: { allOf: [{ $ref: '#/components/schemas/AdoptionRow' }, { type: object, properties: { template: { type: string } } }] } }
+        daily: { type: array, items: { type: object, properties: { date: { type: string, format: date }, shown: { type: integer }, adopted: { type: integer } } } }
+        definition: { type: string }
+    AiUsage:
+      type: object
+      required: [scope, byFeature, totals, imageUnits, agentMessages, recommendations, note]
+      properties:
+        scope: { type: object }
+        byFeature:
+          type: array
+          items:
+            type: object
+            properties:
+              feature: { type: string, description: 'AGENT 助手、OOTD_EXTRACT 整套穿搭样本提取等' }
+              calls: { type: integer }
+              inputTokens: { type: integer }
+              outputTokens: { type: integer }
+              unknownUsage: { type: integer, description: 上游未返回用量的调用次数 }
+        totals: { type: object, properties: { calls: { type: integer }, inputTokens: { type: integer }, outputTokens: { type: integer } } }
+        imageUnits: { type: integer }
+        agentMessages: { type: integer }
+        recommendations: { type: object, properties: { total: { type: integer }, zeroModel: { type: integer }, zeroModelRatio: { type: number } } }
+        topUsers: { type: array, items: { type: object, properties: { username: { type: string }, calls: { type: integer }, tokens: { type: integer } } } }
+        note: { type: string }
+    OpsIssue:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, enum: [EMBEDDING_MODEL_MISSING, SEGMENTATION_MODEL_MISSING, SEMANTIC_INDEX_BEHIND, QUEUE_BACKLOG, TASK_FAILURES, DISK_FULL, RECOGNITION_NOT_CONFIGURED, AGENT_RUNTIME_UNREACHABLE] }
+        message: { type: string }
+    OpsStatus:
+      type: object
+      required: [status, issues, app, jvm, storage, models, indexes, queue, providers, sessions, generatedAtMs]
+      properties:
+        status: { type: string, enum: [UP, DEGRADED] }
+        issues: { type: array, items: { $ref: '#/components/schemas/OpsIssue' } }
+        app: { type: object, properties: { version: { type: string, description: 'jar 包版本' }, buildVersion: { type: string, description: 'CI 写入的发布版本（CLOSET_VERSION），本地构建为 dev' }, commit: { type: string, description: 'CI 写入的提交号（CLOSET_COMMIT），本地构建为空串；匿名 /api/health 不返回（#192）' }, startedAtMs: { type: integer }, uptimeMs: { type: integer }, java: { type: string } } }
+        jvm: { type: object, properties: { heapUsedBytes: { type: integer }, heapMaxBytes: { type: integer }, nonHeapUsedBytes: { type: integer }, threads: { type: integer }, processors: { type: integer }, systemLoadAverage: { type: number }, processCpuLoad: { type: [number, 'null'] }, processRssBytes: { type: [integer, 'null'], description: '进程常驻内存（含模型的堆外内存），仅 Linux' }, systemMemoryTotalBytes: { type: integer }, systemMemoryFreeBytes: { type: integer } } }
+        storage: { type: object, properties: { totalBytes: { type: integer }, usableBytes: { type: integer }, usedRatio: { type: number }, databaseBytes: { type: [integer, 'null'] } } }
+        models: { type: object }
+        indexes: { type: object }
+        queue: { type: object, properties: { byStatus: { type: object }, byKind: { type: array, items: { type: object } }, oldestQueuedAgeMs: { type: [integer, 'null'] }, failed24h: { type: integer } } }
+        providers: { type: object }
+        sessions: { type: object, properties: { active: { type: integer }, onlineLast5Min: { type: integer } } }
+        generatedAtMs: { type: integer }
+    TaskPage:
+      type: object
+      required: [items, total, page, size]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              kind: { type: string }
+              ownerUsername: { type: [string, 'null'] }
+              status: { type: string }
+              stage: { type: integer }
+              pool: { type: string }
+              priority: { type: integer }
+              waitReason: { type: [string, 'null'] }
+              errorMessage: { type: [string, 'null'], description: 截断到 300 字 }
+              attempts: { type: integer }
+              createdAtMs: { type: integer }
+              updatedAtMs: { type: integer }
+              nextRunAtMs: { type: integer }
+        total: { type: integer }
+        page: { type: integer }
+        size: { type: integer }
+    OperationLogPage:
+      type: object
+      required: [items, total, page, size]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              occurredAtMs: { type: integer }
+              keyId: { type: string }
+              operator: { type: [string, 'null'] }
+              requestId: { type: [string, 'null'] }
+              action: { type: string }
+              targetUsername: { type: [string, 'null'] }
+              result: { type: string }
+              detail: { type: [string, 'null'] }
+        total: { type: integer }
+        page: { type: integer }
+        size: { type: integer }
+    DashboardSnapshot:
+      type: object
+      required: [generatedAtMs, refreshAfterMs, tiles, hourly, daily, distributions, ops, growth, heatmap, feed]
+      properties:
+        generatedAtMs: { type: integer }
+        refreshAfterMs: { type: integer }
+        tiles:
+          type: object
+          properties:
+            usersTotal: { type: integer }
+            usersNewToday: { type: integer }
+            activeToday: { type: integer }
+            active7d: { type: integer }
+            active30d: { type: integer }
+            onlineNow: { type: integer, description: 近 5 分钟有请求的登录用户 }
+            garmentsActive: { type: integer }
+            garmentsToday: { type: integer }
+            outfitsTotal: { type: integer }
+            outfitsToday: { type: integer }
+            recommendationsToday: { type: integer }
+            adoptionRate7d: { $ref: '#/components/schemas/Rate' }
+            wearLogsToday: { type: integer }
+            agentMessagesToday: { type: integer }
+            imageUnitsToday: { type: integer }
+            modelTokensToday: { type: integer }
+        hourly: { type: object, description: 近 24 个整点（含当前小时）, properties: { hours: { type: array, items: { type: string } }, series: { type: array, items: { type: object } } } }
+        daily: { type: object, description: 近 30 天, properties: { days: { type: array, items: { type: string, format: date } }, series: { type: array, items: { type: object } } } }
+        distributions:
+          type: object
+          description: categories、colors、seasons、recommendationSources7d；1.2 增加 styles、genderFits、closetSizes（按已入柜衣物数分档的用户数，含 0 件）、registeredVia、aiFeatures30d（近 30 天按功能的模型调用次数与 Token）
+          additionalProperties: true
+        ops: { type: object, properties: { status: { type: string }, issues: { type: integer }, queueBacklog: { type: integer }, failed24h: { type: integer } } }
+        growth:
+          type: object
+          description: 近 30 天每日新增用户与当日结束时的累计用户（1.2）
+          properties:
+            days: { type: array, items: { type: string, format: date } }
+            newUsers: { type: array, items: { type: integer } }
+            cumulative: { type: array, items: { type: integer } }
+        heatmap:
+          type: object
+          description: 近 28 天有记录的操作按星期（1=周一）× 小时（0–23，北京时间）计数（1.2）
+          properties:
+            days: { type: integer }
+            cells: { type: array, items: { type: array, items: { type: integer }, minItems: 3, maxItems: 3 }, description: '[weekday, hour, count]' }
+        feed:
+          type: array
+          description: 全站最新 20 条动态，去标识：只有类型、时间和衣物大类（或注册来源），不含用户名、衣物名称或图片（1.2）
+          items:
+            type: object
+            required: [atMs, kind]
+            properties:
+              atMs: { type: integer }
+              kind: { type: string, enum: [GARMENT_ADDED, OUTFIT_SAVED, WEAR_LOGGED, RECOMMENDATION_LIKED, USER_REGISTERED] }
+              label: { type: [string, 'null'], description: GARMENT_ADDED 为衣物大类键；USER_REGISTERED 为注册来源 }
+    DailyExport:
+      type: object
+      required: [from, to, columns, rows]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        columns: { type: array, items: { type: string } }
+        rows: { type: array, items: { type: object, additionalProperties: true } }
+    EventType:
+      type: string
+      enum: [garment_created, model_usage, outfit_created, quick_intake, recommendation_feedback, recommendation_shown, user_created, wear_logged]
+    EventPage:
+      type: object
+      required: [items, nextCursor, hasMore, watermarkMs]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [type, id, atMs, userKey, attrs]
+            properties:
+              type: { $ref: '#/components/schemas/EventType' }
+              id: { type: string }
+              atMs: { type: integer }
+              userKey: { type: string, description: 'HMAC-SHA256(盐, 用户名) 前 16 位十六进制；换盐即变' }
+              attrs: { type: object, additionalProperties: true }
+        nextCursor: { type: string }
+        hasMore: { type: boolean }
+        watermarkMs: { type: integer }
+    Template:
+      type: object
+      properties:
+        id: { type: string }
+        text: { type: string }
+        source: { type: string, enum: [FILE, SAMPLE] }
+        reviewStatus: { type: string, enum: [PENDING_REVIEW, APPROVED, REJECTED] }
+        enabled: { type: boolean }
+        active: { type: boolean }
+        bonus: { type: number }
+        defaultBonus: { type: number }
+        reviewedBy: { type: [string, 'null'] }
+        reviewedAtMs: { type: integer }
+        kind: { type: string, enum: [CLASSIC, TREND] }
+        audience: { type: array, items: { type: string } }
+        seasons: { type: array, items: { type: string } }
+        occasions: { type: array, items: { type: string } }
+        validFrom: { type: [string, 'null'], format: date }
+        validUntil: { type: [string, 'null'], format: date }
+        reference: { type: string }
+        slots: { type: array, items: { type: object } }
+    PendingStyleTerm:
+      type: object
+      required: [term, styles, hits, proposers, legacy, firstProposedAtMs, lastProposedAtMs, sharedStyles]
+      properties:
+        term: { type: string, description: 归一化后的风格词 }
+        styles: { type: array, items: { type: string }, maxItems: 2, description: 助手给出的映射（标准风格） }
+        hits: { type: integer, description: 提出次数合计 }
+        proposers: { type: integer, description: 提出该映射的不同用户数（不含迁移遗留条目） }
+        legacy: { type: boolean, description: 含迁移前无归属的遗留条目 }
+        firstProposedAtMs: { type: integer, format: int64 }
+        lastProposedAtMs: { type: integer, format: int64 }
+        sharedStyles: { type: [array, 'null'], items: { type: string }, description: 全站词表里该词已有的映射；批准会替换它 }
+    PendingStyleTermPage:
+      type: object
+      required: [items, total, page, size, vocabulary]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PendingStyleTerm' } }
+        total: { type: integer }
+        page: { type: integer }
+        size: { type: integer }
+        vocabulary: { type: array, items: { type: string }, description: 标准风格表 }
+    StyleTermApprove:
+      type: object
+      additionalProperties: false
+      required: [term, proposedStyles]
+      properties:
+        term: { type: string, minLength: 1, maxLength: 40 }
+        proposedStyles: { type: array, minItems: 1, maxItems: 2, items: { type: string, maxLength: 20 }, description: 列表里该项的映射，用来定位提案 }
+        styles: { type: array, maxItems: 2, items: { type: string, maxLength: 20 }, description: 修正后的映射（须在标准风格内）；缺省沿用 proposedStyles }
+    StyleTermReject:
+      type: object
+      additionalProperties: false
+      required: [term, proposedStyles]
+      properties:
+        term: { type: string, minLength: 1, maxLength: 40 }
+        proposedStyles: { type: array, minItems: 1, maxItems: 2, items: { type: string, maxLength: 20 } }
+    StyleTermReviewResult:
+      type: object
+      required: [term, approved, styles]
+      properties:
+        term: { type: string }
+        approved: { type: boolean }
+        styles: { type: array, items: { type: string } }
+    TemplateList:
+      type: object
+      required: [version, maxBonus, active, items]
+      properties:
+        version: { type: string }
+        maxBonus: { type: number }
+        active: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/Template' } }

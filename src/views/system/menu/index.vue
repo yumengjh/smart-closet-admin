@@ -365,6 +365,7 @@ onMounted(async () => {
             <el-option label="鱼搭业务用户" value="closet-users" />
             <el-option label="衣柜洞察" value="closet-insights" />
             <el-option label="业务大屏" value="closet-dashboard" />
+            <el-option label="实时试穿" value="closet-tryon" />
             <el-option label="运行监控" value="closet-ops" />
             <el-option label="数据导出" value="closet-exports" />
             <el-option label="模板审核" value="closet-templates" />
