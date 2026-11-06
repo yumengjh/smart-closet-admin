@@ -1,0 +1,3 @@
+
+# Preserve semantic-equivalent quoting needed by the security YAML parser.
+docs/integrations/closet/management-api.yaml
