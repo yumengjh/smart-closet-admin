@@ -23,3 +23,6 @@ tsconfig.tsbuildinfo
 # Local browser verification artifacts
 .playwright-cli/
 output/playwright/
+
+# Generated, potentially sensitive local security analysis.
+/security-reports/
