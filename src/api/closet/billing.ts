@@ -177,3 +177,96 @@ export const getMargin = (from: string, to: string) =>
   });
 export const getAlerts = () =>
   http.request<ApiResponse<ReportRow[]>>("get", `${root}/margin/alerts`);
+
+export type Entitlement = {
+  id: string;
+  source: string;
+  imageDailyLimit: number | null;
+  agentDailyLimit: number | null;
+  startsAtMs: number;
+  endsAtMs: number;
+  active: boolean;
+  revokedAtMs: number | null;
+};
+export type UserBilling = {
+  userKey: string;
+  balance: number;
+  reserved: number;
+  entitlements: Entitlement[];
+  recent: {
+    id: string;
+    kind: string;
+    points: number;
+    note: string;
+    createdAtMs: number;
+  }[];
+};
+export type Usage = {
+  id: string;
+  userKey: string;
+  tier: string;
+  model: string;
+  unitsIn: number;
+  unitsOut: number;
+  source: string;
+  points: number;
+  revenueMicro: number;
+  revenueCurrency: string;
+  costMicro: number | null;
+  costCurrency: string | null;
+  failed: boolean;
+  atMs: number;
+  costRates: CostRate[];
+};
+export type Explain = {
+  tier: string;
+  fromMs: number;
+  toMs: number;
+  items: Usage[];
+};
+export const getExplain = (
+  tier: string,
+  from: string,
+  to: string,
+  limit = 100
+) =>
+  http.request<ApiResponse<Explain>>("get", `${root}/margin/explain`, {
+    params: { tier, from, to, limit }
+  });
+export const getUserBilling = (username: string) =>
+  http.request<ApiResponse<UserBilling>>(
+    "get",
+    `/closet/users/${encodeURIComponent(username)}/billing`
+  );
+export const changePoints = (
+  username: string,
+  data: { points: number; note?: string },
+  key: string
+) =>
+  http.request<ApiResponse<unknown>>(
+    "post",
+    `/closet/users/${encodeURIComponent(username)}/points`,
+    {
+      data,
+      headers: { "Idempotency-Key": key }
+    }
+  );
+export const grantEntitlement = (
+  username: string,
+  data: {
+    imageDailyLimit?: number;
+    agentDailyLimit?: number;
+    days: number;
+    note?: string;
+  }
+) =>
+  http.request<ApiResponse<Entitlement>>(
+    "post",
+    `/closet/users/${encodeURIComponent(username)}/entitlements`,
+    { data }
+  );
+export const revokeEntitlement = (id: string) =>
+  http.request<ApiResponse<Entitlement>>(
+    "delete",
+    `${root}/entitlements/${encodeURIComponent(id)}`
+  );

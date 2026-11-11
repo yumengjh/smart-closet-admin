@@ -30,7 +30,9 @@ const eventTypes: EventType[] = [
   "recommendation_shown",
   "recommendation_feedback",
   "wear_logged",
-  "model_usage"
+  "model_usage",
+  "billing_order",
+  "billing_ledger"
 ];
 const validRange = () => {
   const days =
@@ -102,9 +104,12 @@ const retry = () => {
 };
 onMounted(loadDaily);
 const label = (column: string) =>
-  ({ date: "日期", input_tokens: "输入 Token", output_tokens: "输出 Token" })[
-    column
-  ] ??
+  ({
+    date: "日期",
+    input_tokens: "输入 Token",
+    output_tokens: "输出 Token",
+    billing: "收费汇总"
+  })[column] ??
   metricNames[column as keyof typeof metricNames] ??
   column;
 </script>
@@ -184,9 +189,19 @@ const label = (column: string) =>
             :key="column"
             :prop="column"
             :label="label(column)"
-            min-width="125"
-            :fixed="column === 'date' ? 'left' : undefined" /></el-table
-      ></template>
+            :min-width="column === 'billing' ? 320 : 125"
+            :fixed="column === 'date' ? 'left' : undefined"
+          >
+            <template #default="{ row }"
+              ><span
+                v-if="column === 'billing'"
+                class="whitespace-pre-wrap break-words"
+                >{{ JSON.stringify(row.billing, null, 2) }}</span
+              ><span v-else>{{ row[column] }}</span></template
+            >
+          </el-table-column></el-table
+        ></template
+      >
       <template v-else-if="tab === 'events' && events"
         ><div class="mb-3 flex flex-wrap items-center gap-3">
           <span class="mr-auto text-sm"

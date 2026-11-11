@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from "vue";
 import {
   getMargin,
   getAlerts,
+  getExplain,
+  type Explain,
   type Margin,
   type ReportRow
 } from "@/api/closet/billing";
@@ -14,6 +16,32 @@ defineOptions({ name: "ClosetBillingMargin" });
 const { can, loading, error, load } = useBilling();
 const range = ref<[string, string]>(dateRange());
 const report = ref<Margin>();
+const explanation = ref<Explain>();
+const tier = ref("image.standard");
+const explainLimit = ref(100);
+const explainLoading = ref(false);
+const explainError = ref("");
+const explainUsage = async () => {
+  if (!valid.value || !can("closet:billing:read") || explainLoading.value)
+    return;
+  explainLoading.value = true;
+  explainError.value = "";
+  try {
+    explanation.value = (
+      await getExplain(
+        tier.value,
+        range.value[0],
+        range.value[1],
+        explainLimit.value
+      )
+    ).data;
+  } catch {
+    explanation.value = undefined;
+    explainError.value = "明细暂时无法加载，请重试。";
+  } finally {
+    explainLoading.value = false;
+  }
+};
 const alerts = ref<ReportRow[]>([]);
 const valid = computed(
   () =>
@@ -143,6 +171,71 @@ onMounted(() => {
         </ul></el-card
       >
     </template>
+    <el-card shadow="never">
+      <h3 class="mb-3 font-semibold">利润明细追溯</h3>
+      <el-form inline
+        ><el-form-item label="档位"
+          ><el-select v-model="tier" class="!w-48"
+            ><el-option
+              v-for="t in ['image.standard', 'agent.chat', 'tryon.realtime']"
+              :key="t"
+              :value="t"
+              :label="t" /></el-select
+        ></el-form-item>
+        <el-form-item label="最多条数"
+          ><el-input-number
+            v-model="explainLimit"
+            :min="1"
+            :max="500"
+            :precision="0"
+        /></el-form-item>
+        <el-button
+          :disabled="!valid"
+          :loading="explainLoading"
+          @click="explainUsage"
+          >查询明细</el-button
+        >
+      </el-form>
+      <el-alert
+        v-if="explainError"
+        :title="explainError"
+        type="error"
+        :closable="false"
+      />
+      <el-table v-if="explanation" :data="explanation.items" stripe>
+        <el-table-column
+          prop="userKey"
+          label="userKey"
+          min-width="170"
+        /><el-table-column prop="model" label="模型" min-width="170" />
+        <el-table-column prop="source" label="来源" /><el-table-column
+          prop="points"
+          label="消耗点数"
+        />
+        <el-table-column
+          prop="revenueCurrency"
+          label="收入币种"
+        /><el-table-column
+          prop="revenueMicro"
+          label="收入（百万分之一币种）"
+          min-width="180"
+        />
+        <el-table-column prop="costCurrency" label="成本币种" /><el-table-column
+          prop="costMicro"
+          label="成本（百万分之一币种）"
+          min-width="180"
+        />
+        <el-table-column label="成本版本" min-width="240"
+          ><template #default="{ row }"
+            ><div v-for="cost in row.costRates" :key="cost.id">
+              {{ cost.id }} · {{ cost.model }} · {{ cost.unit }} ·
+              {{ cost.amountMicro }} {{ cost.currency }}
+            </div>
+            <span v-if="!row.costRates.length">未配置成本</span></template
+          ></el-table-column
+        >
+      </el-table>
+    </el-card>
     <el-card shadow="never"
       ><h3 class="mb-3 font-semibold">价格与成本告警</h3>
       <p class="mb-3 text-sm text-[var(--el-text-color-secondary)]">
