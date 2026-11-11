@@ -98,7 +98,17 @@ export type Series = Array<{ metric: TrendMetric; values: number[] }>;
 export type DashboardSnapshot = {
   generatedAtMs: number;
   refreshAfterMs: number;
-  tiles: Record<string, number | null>;
+  tiles: Record<
+    string,
+    | number
+    | null
+    | Array<{
+        currency: string | null;
+        paidMinor?: number;
+        costMicro?: number;
+        unknownCostUses?: number;
+      }>
+  >;
   hourly: { hours: string[]; series: Series };
   daily: { days: string[]; series: Series };
   distributions: {
@@ -139,7 +149,7 @@ export type DailyExport = {
   from: string;
   to: string;
   columns: string[];
-  rows: Array<Record<string, string | number>>;
+  rows: Array<Record<string, unknown>>;
 };
 export type EventType =
   | "garment_created"
@@ -149,7 +159,9 @@ export type EventType =
   | "recommendation_feedback"
   | "recommendation_shown"
   | "user_created"
-  | "wear_logged";
+  | "wear_logged"
+  | "billing_order"
+  | "billing_ledger";
 export type EventPage = {
   items: Array<{
     type: EventType;

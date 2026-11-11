@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UserBilling from "../billing/UserBilling.vue";
 import {
   getClosetUser,
   getClosetUserLoginLock,
@@ -764,6 +765,19 @@ const clearTemporaryPassword = () => {
                 >
               </div>
             </div>
+          </el-tab-pane>
+
+          <el-tab-pane
+            v-if="can('closet:billing:read')"
+            label="点数与权益"
+            name="billing"
+            lazy
+          >
+            <UserBilling
+              v-if="tab === 'billing' && detail"
+              :key="detail.username"
+              :username="detail.username"
+            />
           </el-tab-pane>
 
           <el-tab-pane label="账号记录" name="events">

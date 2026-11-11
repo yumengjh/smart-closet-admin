@@ -83,7 +83,47 @@ const kpis = [
     spark: "recommendations_shown"
   }
 ] as const;
-const tile = (key: string) => snapshot.value?.tiles[key];
+const tile = (key: string) => {
+  const value = snapshot.value?.tiles[key];
+  return typeof value === "number" ? value : null;
+};
+const financial = computed(() => {
+  const revenue = snapshot.value?.tiles.revenueToday;
+  const costs = snapshot.value?.tiles.costToday;
+  const amount = (
+    rows: typeof revenue,
+    key: "paidMinor" | "costMicro",
+    scale: number
+  ) =>
+    Array.isArray(rows) && rows.length
+      ? rows
+          .map(
+            row =>
+              `${row.currency || "币种未确认"} ${((row[key] || 0) / scale).toLocaleString("zh-CN", { maximumFractionDigits: 6 })}`
+          )
+          .join(" · ")
+      : "暂无记录";
+  const unknown = Array.isArray(costs)
+    ? costs.reduce((sum, row) => sum + (row.unknownCostUses || 0), 0)
+    : 0;
+  return [
+    {
+      label: "今日订单",
+      value: String(tile("ordersToday") ?? 0),
+      note: "按当前订单状态统计"
+    },
+    {
+      label: "今日实收",
+      value: amount(revenue, "paidMinor", 100),
+      note: "按付款时间与原币种统计"
+    },
+    {
+      label: "今日上游成本",
+      value: amount(costs, "costMicro", 1000000),
+      note: unknown ? `其中 ${unknown} 次成本未知` : "按原币种分别统计"
+    }
+  ];
+});
 const dailySeries = (metric: string) =>
   snapshot.value?.daily.series.find(item => item.metric === metric)?.values ??
   [];
@@ -484,6 +524,13 @@ const fullscreen = async () => {
             >
           </div>
         </div>
+        <div v-for="item in financial" :key="item.label" class="kpi financial">
+          <div class="kpi-text">
+            <span class="kpi-label">{{ item.label }}</span
+            ><strong class="financial-value">{{ item.value }}</strong
+            ><span class="kpi-sub">{{ item.note }}</span>
+          </div>
+        </div>
       </div>
 
       <div class="panel p-categories">
@@ -756,28 +803,6 @@ const fullscreen = async () => {
   }
 }
 
-/* Fixed-height screen only where there is room; smaller windows scroll as a normal page. */
-@media (width <= 1279px), (height <= 640px) {
-  .screen {
-    display: flex;
-    flex-direction: column;
-    height: auto !important;
-    overflow: visible;
-  }
-
-  .kpi-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .panel {
-    min-height: 260px;
-  }
-
-  .kpi {
-    min-height: 80px;
-  }
-}
-
 /* Cards sit directly on the layout's page background; the screen itself has none. */
 .screen {
   --screen-bg: var(--el-bg-color-page);
@@ -794,7 +819,7 @@ const fullscreen = async () => {
   position: relative;
   display: grid;
   grid-template:
-    92px minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr)
+    196px minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr)
     / repeat(12, minmax(0, 1fr));
   gap: 14px;
   min-height: 0;
@@ -856,6 +881,16 @@ const fullscreen = async () => {
   gap: 14px;
   align-items: stretch;
   min-height: 0;
+}
+
+.kpi.financial {
+  grid-column: span 2;
+}
+.financial-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--screen-strong);
+  overflow-wrap: anywhere;
 }
 
 /* Screen settings live in the corner of the status card instead of taking a column of their own. */
@@ -1327,6 +1362,30 @@ const fullscreen = async () => {
   position: absolute;
   top: 0;
   right: 0;
+}
+/* Fixed-height screen only where there is room; smaller windows scroll as a normal page. */
+@media (width <= 1279px), (height <= 640px) {
+  .screen {
+    display: flex;
+    flex-direction: column;
+    height: auto !important;
+    overflow: visible;
+  }
+
+  .kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel {
+    min-height: 260px;
+  }
+
+  .kpi {
+    min-height: 80px;
+  }
+  .kpi.financial {
+    grid-column: span 1;
+  }
 }
 </style>
 <!-- Unscoped: the platform switches theme with an html.dark class. -->
