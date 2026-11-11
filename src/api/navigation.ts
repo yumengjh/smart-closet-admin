@@ -34,6 +34,11 @@ export type NavigationMenu = {
     | "closet-templates"
     | "closet-style-terms"
     | "closet-tryon"
+    | "closet-billing-settings"
+    | "closet-billing-tiers"
+    | "closet-billing-products"
+    | "closet-billing-redemptions"
+    | "closet-billing-margin"
     | null;
   icon: string | null;
   sortOrder: number;

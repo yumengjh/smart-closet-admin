@@ -366,6 +366,21 @@ onMounted(async () => {
             <el-option label="衣柜洞察" value="closet-insights" />
             <el-option label="业务大屏" value="closet-dashboard" />
             <el-option label="实时试穿" value="closet-tryon" />
+            <el-option
+              label="收费管理 · 总开关与能力开关"
+              value="closet-billing-settings" />
+            <el-option
+              label="收费管理 · 档位与成本"
+              value="closet-billing-tiers" />
+            <el-option
+              label="收费管理 · 商品与订单"
+              value="closet-billing-products" />
+            <el-option
+              label="收费管理 · 兑换码批次"
+              value="closet-billing-redemptions" />
+            <el-option
+              label="收费管理 · 利润报表"
+              value="closet-billing-margin" />
             <el-option label="运行监控" value="closet-ops" />
             <el-option label="数据导出" value="closet-exports" />
             <el-option label="模板审核" value="closet-templates" />

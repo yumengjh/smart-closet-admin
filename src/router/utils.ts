@@ -57,6 +57,16 @@ export const routeComponentRegistry: Record<
     import("@/views/integrations/closet/templates/index.vue"),
   "closet-style-terms": () =>
     import("@/views/integrations/closet/style-terms/index.vue"),
+  "closet-billing-settings": () =>
+    import("@/views/integrations/closet/billing/Settings.vue"),
+  "closet-billing-tiers": () =>
+    import("@/views/integrations/closet/billing/Tiers.vue"),
+  "closet-billing-products": () =>
+    import("@/views/integrations/closet/billing/Products.vue"),
+  "closet-billing-redemptions": () =>
+    import("@/views/integrations/closet/billing/Redemptions.vue"),
+  "closet-billing-margin": () =>
+    import("@/views/integrations/closet/billing/Margin.vue"),
   "closet-tryon": () => import("@/views/integrations/closet/tryon/index.vue"),
   "closet-registration": () =>
     import("@/views/integrations/closet/registration/index.vue"),
