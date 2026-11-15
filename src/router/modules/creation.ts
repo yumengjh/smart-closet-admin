@@ -7,6 +7,13 @@ export default {
   meta: { title: "穿搭创作", icon: "ri/image-line", rank: 39 },
   children: [
     {
+      path: "/creation/showcases",
+      name: "ClosetCreationShowcases",
+      component: () =>
+        import("@/views/integrations/closet/creation/Showcases.vue"),
+      meta: { title: "官方素材", auths: ["closet:showcase:read"] }
+    },
+    {
       path: "/creation/templates",
       name: "ClosetCreationTemplates",
       component: () =>

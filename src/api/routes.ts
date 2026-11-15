@@ -37,6 +37,7 @@ export type NavigationRoute = {
     | "closet-creation-templates"
     | "closet-creation-capabilities"
     | "closet-creation-usage"
+    | "closet-creation-showcases"
     | null;
   title: string;
   icon: string | null;

@@ -374,6 +374,9 @@ onMounted(async () => {
               value="closet-creation-capabilities" />
             <el-option label="穿搭创作 · 用量" value="closet-creation-usage" />
             <el-option
+              label="穿搭创作 · 官方素材"
+              value="closet-creation-showcases" />
+            <el-option
               label="收费管理 · 总开关与能力开关"
               value="closet-billing-settings" />
             <el-option

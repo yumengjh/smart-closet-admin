@@ -1,0 +1,1 @@
+export const useCurrentPermissions=()=>({can:(permission:string)=> !location.search.includes('readOnly') || permission.endsWith(':read')});
