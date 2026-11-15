@@ -4,14 +4,14 @@
 #   scripts/sync-closet-contract.sh [source repository path]
 #   scripts/sync-closet-contract.sh --check [source repository path]
 #
-# The default source is ../art-showcase-server. The snapshot is four provenance
+# The default source is ../smart-closet-server. The snapshot is four provenance
 # lines followed by the source YAML unchanged.
 set -euo pipefail
 
 check=false
 if [[ "${1:-}" == "--check" ]]; then check=true; shift; fi
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-closet="${1:-$root/../art-showcase-server}"
+closet="${1:-$root/../smart-closet-server}"
 source_file="$closet/docs/management-api.yaml"
 snapshot="$root/docs/integrations/closet/management-api.yaml"
 
