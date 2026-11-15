@@ -50,6 +50,7 @@ function clearPreview() {
 }
 function reset() {
   clearPreview();
+  previewLoading.value = false;
   selected.value = undefined;
   file.value = undefined;
   uploaded.value = undefined;
