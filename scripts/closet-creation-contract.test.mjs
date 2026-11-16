@@ -109,6 +109,7 @@ assert.ok(calls.at(-1)[1].endsWith("v%2Fa"), "version IDs must be encoded");
 
 for (const key of [
   "closet-creation-templates",
+  "closet-creation-guide",
   "closet-creation-capabilities",
   "closet-creation-usage"
 ]) {
@@ -123,6 +124,56 @@ for (const key of [
       `${key} missing in ${file}`
     );
 }
+
+const readProjectFile = file =>
+  readFile(new URL(file, import.meta.url), "utf8");
+const [creationRoutes, dynamicRoutes, offlineIcons] = await Promise.all([
+  readProjectFile("../src/router/modules/creation.ts"),
+  readProjectFile("../src/router/utils.ts"),
+  readProjectFile("../src/components/ReIcon/src/offlineIcon.ts")
+]);
+assert.ok(
+  creationRoutes.includes('redirect: "/creation/guide"'),
+  "the creation module must open the guide by default"
+);
+
+const creationPages = [
+  ["guide", "closet-creation-guide", "ri/book-open-line", "Guide.vue"],
+  ["templates", "closet-creation-templates", "ri/image-line", "Templates.vue"],
+  [
+    "capabilities",
+    "closet-creation-capabilities",
+    "ri/settings-3-line",
+    "Capabilities.vue"
+  ],
+  ["usage", "closet-creation-usage", "ri/bar-chart-line", "Usage.vue"],
+  ["showcases", "closet-creation-showcases", "ri/gallery-line", "Showcases.vue"]
+];
+for (const [route, key, icon, view] of creationPages) {
+  const componentPath = `@/views/integrations/closet/creation/${view}`;
+  assert.ok(
+    creationRoutes.includes(`path: "/creation/${route}"`) &&
+      creationRoutes.includes(componentPath) &&
+      creationRoutes.includes(`icon: "${icon}"`),
+    `static route, component, or icon missing for ${route}`
+  );
+  assert.ok(
+    dynamicRoutes.includes(`"${key}": () =>`) &&
+      dynamicRoutes.includes(componentPath),
+    `dynamic route component missing for ${key}`
+  );
+  const symbol = icon
+    .split("/")[1]
+    .split("-")
+    .map(part => part[0].toUpperCase() + part.slice(1))
+    .join("");
+  const importName = `Ri${symbol}`;
+  assert.ok(
+    offlineIcons.includes(`import ${importName} from "~icons/${icon}?raw";`) &&
+      offlineIcons.includes(`["${icon}", ${importName}]`),
+    `offline icon import or registration missing for ${icon}`
+  );
+}
 console.log(
-  "Creation API: 11 operations and 3 navigation keys verified against recording transport."
+  "Creation API: 11 operations, static/dynamic navigation, and offline icons verified."
 );

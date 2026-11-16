@@ -370,6 +370,9 @@ onMounted(async () => {
               label="穿搭创作 · 模板"
               value="closet-creation-templates" />
             <el-option
+              label="穿搭创作 · 使用指南"
+              value="closet-creation-guide" />
+            <el-option
               label="穿搭创作 · 模型能力"
               value="closet-creation-capabilities" />
             <el-option label="穿搭创作 · 用量" value="closet-creation-usage" />

@@ -69,6 +69,8 @@ export const routeComponentRegistry: Record<
     import("@/views/integrations/closet/billing/Margin.vue"),
   "closet-creation-templates": () =>
     import("@/views/integrations/closet/creation/Templates.vue"),
+  "closet-creation-guide": () =>
+    import("@/views/integrations/closet/creation/Guide.vue"),
   "closet-creation-capabilities": () =>
     import("@/views/integrations/closet/creation/Capabilities.vue"),
   "closet-creation-showcases": () =>
