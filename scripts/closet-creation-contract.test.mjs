@@ -70,6 +70,12 @@ const cases = [
     `${base}/retire`,
     { revision: 4 }
   ],
+  [
+    "getCreationGenerationOptions",
+    [],
+    "get",
+    "/closet/creations/generation-options"
+  ],
   ["getCreationCapabilities", [], "get", "/closet/creations/capabilities"],
   [
     "saveCreationCapability",
@@ -118,5 +124,5 @@ for (const key of [
     );
 }
 console.log(
-  "Creation API: 10 operations and 3 navigation keys verified against recording transport."
+  "Creation API: 11 operations and 3 navigation keys verified against recording transport."
 );

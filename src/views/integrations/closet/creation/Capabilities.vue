@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import {
   getCreationCapabilities,
+  getCreationGenerationOptions,
   saveCreationCapability,
   type Capability,
-  type CapabilityEdit
+  type CapabilityEdit,
+  type CreationGenerationOptions
 } from "@/api/closet/creation";
 import { useCurrentPermissions } from "@/composables/useCurrentPermissions";
 import { message } from "@/utils/message";
@@ -13,11 +15,55 @@ const { can } = useCurrentPermissions();
 const rows = ref<Capability[]>([]);
 const loading = ref(false);
 const saving = ref(false);
+const optionsLoading = ref(false);
+const optionsFailed = ref(false);
+const generationOptions = ref<CreationGenerationOptions | null>(null);
 const open = ref(false);
 const editing = ref(false);
+const selectionMode = ref<"default" | "single" | "existing">("default");
 const form = ref<CapabilityEdit>();
 const optionsText = ref("{}");
-async function refresh() {
+const defaultSelection = computed(
+  () => generationOptions.value?.defaultSelection ?? null
+);
+const providerOptions = computed(() => {
+  const seen = new Set<string>();
+  return (generationOptions.value?.providers ?? []).filter(option => {
+    if (seen.has(option.provider)) return false;
+    seen.add(option.provider);
+    return true;
+  });
+});
+const modelsForProvider = computed(() =>
+  (generationOptions.value?.providers ?? []).filter(
+    option => option.provider === form.value?.provider
+  )
+);
+const hasConfiguredSelection = computed(
+  () =>
+    !!form.value &&
+    (generationOptions.value?.providers ?? []).some(
+      option =>
+        option.provider === form.value?.provider &&
+        option.model === form.value?.model
+    )
+);
+const canSave = computed(
+  () =>
+    !!form.value &&
+    can("closet:creation:write") &&
+    !saving.value &&
+    !optionsLoading.value &&
+    !optionsFailed.value &&
+    hasConfiguredSelection.value
+);
+
+function applyDefaultSelection() {
+  if (!form.value || editing.value || selectionMode.value !== "default") return;
+  form.value.provider = defaultSelection.value?.provider ?? "";
+  form.value.model = defaultSelection.value?.model ?? "";
+}
+async function refreshCapabilities() {
   loading.value = true;
   try {
     rows.value = (await getCreationCapabilities()).data.items;
@@ -26,6 +72,23 @@ async function refresh() {
   } finally {
     loading.value = false;
   }
+}
+async function refreshGenerationOptions() {
+  optionsLoading.value = true;
+  optionsFailed.value = false;
+  try {
+    generationOptions.value = (await getCreationGenerationOptions()).data;
+    applyDefaultSelection();
+  } catch {
+    generationOptions.value = null;
+    optionsFailed.value = true;
+  } finally {
+    optionsLoading.value = false;
+  }
+}
+function refreshAll() {
+  void refreshCapabilities();
+  void refreshGenerationOptions();
 }
 function fail(e: unknown) {
   const response = (
@@ -48,6 +111,7 @@ async function copyPricingKey(key: string) {
 }
 function edit(row?: Capability) {
   editing.value = !!row;
+  selectionMode.value = row ? "existing" : "default";
   form.value = row
     ? {
         provider: row.provider,
@@ -69,20 +133,44 @@ function edit(row?: Capability) {
         notes: "",
         outputOptions: {}
       };
+  applyDefaultSelection();
   optionsText.value = JSON.stringify(form.value.outputOptions, null, 2);
   open.value = true;
 }
+function changeSelectionMode(mode: "default" | "single") {
+  if (!form.value || editing.value) return;
+  selectionMode.value = mode;
+  if (mode === "default") {
+    applyDefaultSelection();
+  } else {
+    form.value.provider = "";
+    form.value.model = "";
+  }
+}
+function changeProvider(provider: string) {
+  if (!form.value) return;
+  const choices = (generationOptions.value?.providers ?? []).filter(
+    option => option.provider === provider
+  );
+  const defaultForProvider = choices.find(
+    option =>
+      option.provider === defaultSelection.value?.provider &&
+      option.model === defaultSelection.value?.model
+  );
+  form.value.model = defaultForProvider?.model ?? choices[0]?.model ?? "";
+}
 async function save() {
-  if (!form.value || saving.value || !can("closet:creation:write")) return;
+  if (!form.value || !canSave.value) return;
   try {
-    const options = JSON.parse(optionsText.value);
+    const text = optionsText.value.trim();
+    const options = text ? JSON.parse(text) : {};
     if (!options || Array.isArray(options) || typeof options !== "object")
       throw new Error("invalid");
     saving.value = true;
     await saveCreationCapability({ ...form.value, outputOptions: options });
     open.value = false;
     message("模型能力已保存", { type: "success" });
-    await refresh();
+    await refreshCapabilities();
   } catch (e) {
     if (
       e instanceof SyntaxError ||
@@ -95,7 +183,7 @@ async function save() {
   }
 }
 onMounted(() => {
-  if (can("closet:creation:read")) void refresh();
+  if (can("closet:creation:read")) refreshAll();
 });
 </script>
 <template>
@@ -106,7 +194,7 @@ onMounted(() => {
       在收费管理的成本费率中使用成本标识配置对应模型的费率。
     </p>
     <div class="toolbar">
-      <el-button @click="refresh">刷新</el-button
+      <el-button @click="refreshAll">刷新</el-button
       ><el-button
         v-if="can('closet:creation:write')"
         type="primary"
@@ -168,14 +256,115 @@ onMounted(() => {
         ></el-table-column
       >
     </el-table>
-    <el-dialog v-model="open" title="模型能力" width="min(680px, 94vw)">
+    <el-dialog
+      v-model="open"
+      :title="editing ? '编辑模型能力' : '新增模型能力'"
+      width="min(680px, 94vw)"
+    >
       <el-form v-if="form" label-position="top">
-        <el-form-item label="供应商"
-          ><el-input v-model="form.provider" :disabled="editing"
-        /></el-form-item>
-        <el-form-item label="模型"
-          ><el-input v-model="form.model" :disabled="editing"
-        /></el-form-item>
+        <el-alert
+          v-if="optionsLoading"
+          title="正在读取已配置的生图模型。"
+          type="info"
+          :closable="false"
+        />
+        <el-alert
+          v-else-if="optionsFailed"
+          title="生图配置读取失败，当前不能新增或保存模型能力。"
+          type="error"
+          :closable="false"
+        />
+        <el-alert
+          v-else-if="
+            !optionsLoading &&
+            generationOptions &&
+            generationOptions.providers.length === 0
+          "
+          title="尚未配置可用的生图模型，请先配置生图服务。"
+          type="warning"
+          :closable="false"
+        />
+        <el-alert
+          v-else-if="
+            editing &&
+            !optionsLoading &&
+            generationOptions &&
+            !hasConfiguredSelection
+          "
+          title="此能力使用的供应商或模型已不在当前可选配置中，暂不能保存。请恢复该生图配置后再编辑。"
+          type="warning"
+          :closable="false"
+        />
+        <el-button
+          v-if="optionsFailed"
+          link
+          type="primary"
+          :disabled="optionsLoading"
+          @click="refreshGenerationOptions"
+        >
+          重新读取生图配置
+        </el-button>
+        <el-form-item v-if="!editing" label="模型来源">
+          <el-radio-group
+            v-model="selectionMode"
+            :disabled="
+              optionsLoading || optionsFailed || !providerOptions.length
+            "
+            @change="changeSelectionMode"
+          >
+            <el-radio-button label="default">复用生图默认</el-radio-button>
+            <el-radio-button label="single">单独选择</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="editing" label="已记录模型">
+          <span>{{ form.provider }} / {{ form.model }}</span>
+        </el-form-item>
+        <el-form-item
+          v-else-if="selectionMode === 'default'"
+          label="当前生效选择"
+        >
+          <span v-if="optionsLoading">正在读取生图配置…</span>
+          <span v-else-if="defaultSelection">
+            {{ defaultSelection.provider }} / {{ defaultSelection.model }}
+          </span>
+          <span v-else>尚无可用的生图默认模型</span>
+        </el-form-item>
+        <template v-else-if="selectionMode === 'single'">
+          <el-form-item label="供应商">
+            <el-select
+              v-model="form.provider"
+              filterable
+              placeholder="选择已配置供应商"
+              :disabled="
+                optionsLoading || optionsFailed || !providerOptions.length
+              "
+              @change="changeProvider"
+            >
+              <el-option
+                v-for="option in providerOptions"
+                :key="option.provider"
+                :label="option.provider"
+                :value="option.provider"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="模型">
+            <el-select
+              v-model="form.model"
+              placeholder="选择该供应商的可用模型"
+              :disabled="
+                optionsLoading || optionsFailed || !modelsForProvider.length
+              "
+            >
+              <el-option
+                v-for="option in modelsForProvider"
+                :key="`${option.provider}:${option.model}`"
+                :label="option.model"
+                :value="option.model"
+              />
+            </el-select>
+          </el-form-item>
+        </template>
         <el-form-item label="参考图上限"
           ><el-input-number v-model="form.maxReferences" :min="1" :max="20"
         /></el-form-item>
@@ -188,14 +377,24 @@ onMounted(() => {
         <el-form-item label="验证说明"
           ><el-input v-model="form.notes" type="textarea" :rows="3"
         /></el-form-item>
-        <el-form-item label="输出配置（JSON 对象）"
-          ><el-input v-model="optionsText" type="textarea" :rows="6"
-        /></el-form-item>
+        <el-form-item label="输出参数覆盖（JSON 对象，可留空继承供应商默认值）">
+          <el-input v-model="optionsText" type="textarea" :rows="6" />
+          <p class="caption">
+            这里只保存本条能力的覆盖参数；留空或填写 {} 都会继承供应商默认参数。
+          </p>
+        </el-form-item>
       </el-form>
       <template #footer
         ><el-button @click="open = false">取消</el-button
-        ><el-button type="primary" :loading="saving" @click="save"
+        ><el-button
+          v-if="can('closet:creation:write')"
+          type="primary"
+          :loading="saving"
+          :disabled="!canSave"
+          @click="save"
           >保存</el-button
+        ><span v-else class="caption"
+          >当前账号没有模型能力编辑权限。</span
         ></template
       >
     </el-dialog>

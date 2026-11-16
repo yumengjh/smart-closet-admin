@@ -98,6 +98,15 @@ export type CapabilityEdit = Pick<
   | "notes"
   | "outputOptions"
 >;
+export type CreationGenerationOption = {
+  provider: string;
+  model: string;
+  protocol: string;
+};
+export type CreationGenerationOptions = {
+  defaultSelection: { provider: string; model: string } | null;
+  providers: CreationGenerationOption[];
+};
 const root = "/closet/creations";
 const template = (id: string) => `${root}/templates/${encodeURIComponent(id)}`;
 const version = (id: string, v: string) =>
@@ -145,6 +154,11 @@ export const getCreationCapabilities = () =>
   http.request<ApiResponse<{ items: Capability[] }>>(
     "get",
     `${root}/capabilities`
+  );
+export const getCreationGenerationOptions = () =>
+  http.request<ApiResponse<CreationGenerationOptions>>(
+    "get",
+    `${root}/generation-options`
   );
 export const saveCreationCapability = (data: CapabilityEdit) =>
   http.request<ApiResponse<Capability>>("put", `${root}/capabilities`, {
