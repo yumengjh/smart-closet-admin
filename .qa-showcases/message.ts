@@ -1,0 +1,1 @@
+import { ElMessage } from 'element-plus'; export const message=(text:string,opts:any)=>ElMessage({...opts,message:text});

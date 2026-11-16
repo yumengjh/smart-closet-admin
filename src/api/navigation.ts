@@ -42,6 +42,7 @@ export type NavigationMenu = {
     | "closet-creation-templates"
     | "closet-creation-capabilities"
     | "closet-creation-usage"
+    | "closet-creation-showcases"
     | null;
   icon: string | null;
   sortOrder: number;

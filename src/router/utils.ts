@@ -71,6 +71,8 @@ export const routeComponentRegistry: Record<
     import("@/views/integrations/closet/creation/Templates.vue"),
   "closet-creation-capabilities": () =>
     import("@/views/integrations/closet/creation/Capabilities.vue"),
+  "closet-creation-showcases": () =>
+    import("@/views/integrations/closet/creation/Showcases.vue"),
   "closet-creation-usage": () =>
     import("@/views/integrations/closet/creation/Usage.vue"),
   "closet-tryon": () => import("@/views/integrations/closet/tryon/index.vue"),
