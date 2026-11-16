@@ -53,7 +53,7 @@ function openPage(path: string, permission: string) {
       <div>
         <h1>穿搭创作使用指南</h1>
         <p>
-          这里管理创作能力、效果模板和公开展示素材；实际生成由用户在自己的衣柜中完成。
+          这里管理模型能力、效果模板和公开展示素材；用户从“试穿”进入创作，使用自己衣柜里的衣物生成作品。
         </p>
       </div>
       <el-tag effect="plain">管理员指南</el-tag>
@@ -65,7 +65,7 @@ function openPage(path: string, permission: string) {
         <strong>用户艺术创作</strong
         >：管理员准备模型能力和效果模板，用户选择自己的衣物与形象生成私人作品。
         <strong>官方宣传素材</strong>：管理员上传另行准备并允许公开的
-        PNG，用于用户端登录区域展示。 后台不会生成图片，也不会自动公开用户作品。
+        PNG，用于用户端登录区域展示。这些管理页不会自动生成图片，也不会自动公开用户作品。
       </p>
     </el-alert>
 
@@ -102,7 +102,7 @@ function openPage(path: string, permission: string) {
             :disabled="!canOpen(page.permission)"
             @click="openPage(page.path, page.permission)"
           >
-            打开页面
+            打开{{ page.title }}
           </el-button>
         </li>
       </ul>
@@ -111,13 +111,13 @@ function openPage(path: string, permission: string) {
     <section class="guide-section" aria-labelledby="workflow-title">
       <div class="section-heading">
         <h2 id="workflow-title">操作流程</h2>
-        <p>用户作品和官方展示素材各自独立配置、独立发布。</p>
+        <p>效果模板和官方展示素材分别审核发布，用户私人作品不会自动公开。</p>
       </div>
 
       <el-tabs v-model="activeFlow" class="workflow-tabs">
         <el-tab-pane label="用户艺术创作" name="user-art">
           <div class="flow-intro">
-            <h3>管理员准备，用户在衣柜里创作</h3>
+            <h3>管理员准备效果，用户进入穿搭创作</h3>
             <p>
               保存草稿或记录验证都不会发起生图；发布模板也只让它可供用户选择。
             </p>
@@ -177,10 +177,10 @@ function openPage(path: string, permission: string) {
             <li>
               <span class="step-number">04</span>
               <div>
-                <h4>用户从自己的衣柜进入</h4>
+                <h4>用户从试穿或搭配详情进入</h4>
                 <p>
                   打开创作功能后，用户可从“试穿 →
-                  穿搭创作”进入，也可从已保存搭配详情进入“我的作品”。
+                  穿搭创作”进入，也可从已保存搭配详情进入“穿搭创作”。
                   用户选择已拥有且图片已确认的衣物；平铺效果不需要形象，需要人物的效果则选择已确认属于自己的形象。成图为单张
                   3:4，完成的作品可在“我的作品”查看、保存或分享。只有请求实际派发后才会使用图片次数。
                 </p>
@@ -340,7 +340,7 @@ function openPage(path: string, permission: string) {
 .flow-intro p,
 .steps p {
   line-height: 1.75;
-  color: var(--el-text-color-secondary);
+  color: var(--el-text-color-regular);
 }
 
 .guide-heading p {
@@ -355,6 +355,7 @@ function openPage(path: string, permission: string) {
 .purpose-alert p {
   margin: 8px 0 0;
   line-height: 1.8;
+  color: var(--el-text-color-regular);
 }
 
 .guide-section {
@@ -411,6 +412,7 @@ function openPage(path: string, permission: string) {
 .permission-note {
   display: block;
   margin-top: 4px;
+  color: var(--el-text-color-regular);
 }
 
 .workflow-tabs {
