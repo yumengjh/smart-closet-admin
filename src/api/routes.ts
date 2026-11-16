@@ -34,6 +34,9 @@ export type NavigationRoute = {
     | "closet-billing-products"
     | "closet-billing-redemptions"
     | "closet-billing-margin"
+    | "closet-creation-templates"
+    | "closet-creation-capabilities"
+    | "closet-creation-usage"
     | null;
   title: string;
   icon: string | null;

@@ -367,6 +367,13 @@ onMounted(async () => {
             <el-option label="业务大屏" value="closet-dashboard" />
             <el-option label="实时试穿" value="closet-tryon" />
             <el-option
+              label="穿搭创作 · 模板"
+              value="closet-creation-templates" />
+            <el-option
+              label="穿搭创作 · 模型能力"
+              value="closet-creation-capabilities" />
+            <el-option label="穿搭创作 · 用量" value="closet-creation-usage" />
+            <el-option
               label="收费管理 · 总开关与能力开关"
               value="closet-billing-settings" />
             <el-option
