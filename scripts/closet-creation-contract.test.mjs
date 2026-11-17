@@ -116,6 +116,12 @@ const cases = [
   ["getCreationTrial", ["t1"], "get", "/closet/creations/trials/t1"],
   ["getCreationTrialImage", ["t1"], "get", "/closet/creations/trials/t1/image"],
   [
+    "getCreationPreviewImage",
+    [id, version],
+    "get",
+    `${base}/versions/${version}/preview-image`
+  ],
+  [
     "setCreationPreview",
     [id, version, { trialId: "t1" }],
     "post",
@@ -216,5 +222,5 @@ for (const [route, key, icon, view] of creationPages) {
   );
 }
 console.log(
-  "Creation API: 23 operations, static/dynamic navigation, and offline icons verified."
+  "Creation API: 24 operations, static/dynamic navigation, and offline icons verified."
 );

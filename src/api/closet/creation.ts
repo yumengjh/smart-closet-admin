@@ -264,3 +264,7 @@ export const launchCreationVersion = (id: string, v: string, data: UseTrial) =>
   http.request<ApiResponse<VersionDetail>>("post", `${version(id, v)}/launch`, {
     data
   });
+export const getCreationPreviewImage = (id: string, v: string) =>
+  http.request<Blob>("get", `${version(id, v)}/preview-image`, {
+    responseType: "blob"
+  });

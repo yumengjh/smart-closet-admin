@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessageBox } from "element-plus";
 import {
   createCreationVersion,
   getCreationGenerationOptions,
+  getCreationPreviewImage,
   getCreationTemplates,
   getCreationVersion,
   launchCreationVersion,
@@ -48,6 +49,32 @@ const form = reactive({
   modelKey: ""
 });
 const base = ref("");
+const previewUrl = ref("");
+let previewSerial = 0;
+async function loadPreview() {
+  const d = detail.value;
+  const serial = ++previewSerial;
+  let url = "";
+  if (d?.previewImage) {
+    try {
+      url = URL.createObjectURL(
+        await getCreationPreviewImage(props.templateId, d.versionId)
+      );
+    } catch {
+      // 没有示意图时按空处理
+    }
+  }
+  if (serial !== previewSerial) {
+    if (url) URL.revokeObjectURL(url);
+    return;
+  }
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
+  previewUrl.value = url;
+}
+onBeforeUnmount(() => {
+  previewSerial++;
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
+});
 
 const keyOf = (provider: string, model: string) => `${provider}\n${model}`;
 const state = computed(() => effectState(summary.value!));
@@ -133,6 +160,7 @@ async function load() {
   } finally {
     loading.value = false;
   }
+  void loadPreview();
 }
 async function run(fn: () => Promise<unknown>, success: string) {
   if (busy.value) return false;
@@ -262,6 +290,18 @@ onMounted(async () => {
           @click="modify(detail.versionId)"
           >修改</el-button
         >
+      </div>
+
+      <div class="preview">
+        <img v-if="previewUrl" :src="previewUrl" alt="示意图" />
+        <div v-else class="ph" />
+        <div class="hint">
+          {{
+            previewUrl
+              ? "示意图（用户选效果时看到）"
+              : "还没有示意图，试做满意后可以设为示意图"
+          }}
+        </div>
       </div>
 
       <section class="step">
@@ -469,6 +509,20 @@ onMounted(async () => {
 .prompt :deep(textarea) {
   font-family: var(--el-font-family-monospace, ui-monospace, Menlo, monospace);
   font-size: 13px;
+}
+.preview {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+.preview img,
+.preview .ph {
+  width: 96px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--el-fill-color-light);
+  border-radius: 4px;
 }
 .save-row {
   display: flex;

@@ -1,25 +1,43 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import {
+  getCreationPreviewImage,
   getCreationTemplates,
   type TemplateSummary
 } from "@/api/closet/creation";
 import { useCurrentPermissions } from "@/composables/useCurrentPermissions";
 import { message } from "@/utils/message";
 import EffectEditor from "./EffectEditor.vue";
-import { effectState, errorText } from "./effectShared";
+import { effectState, errorText, useBlobImages } from "./effectShared";
 
 defineOptions({ name: "ClosetCreationTemplates" });
 const { can } = useCurrentPermissions();
 const templates = ref<TemplateSummary[]>([]);
 const loading = ref(false);
 const editing = ref<string>();
+// 示意图优先取线上版本，没有线上版本取草稿；取不到就用占位，不提示错误。
+const key = (t: TemplateSummary) => {
+  const v = effectState(t);
+  const id = (v.published ?? v.draft)?.versionId;
+  return id ? `${t.id}|${id}` : "";
+};
+const previews = useBlobImages(k => {
+  const [t, v] = k.split("|");
+  return getCreationPreviewImage(t, v);
+});
 
 async function refresh() {
   if (!can("closet:creation:read")) return;
   loading.value = true;
   try {
     templates.value = (await getCreationTemplates()).data.items;
+    templates.value.forEach(t => {
+      const k = key(t);
+      if (k) {
+        previews.drop(k);
+        previews.load(k);
+      }
+    });
   } catch (e) {
     message(errorText(e), { type: "error" });
   } finally {
@@ -41,7 +59,14 @@ onMounted(refresh);
       <p class="caption">每个效果上线前，先试做一张看看效果。</p>
       <div v-loading="loading" class="effects">
         <article v-for="t in templates" :key="t.id" class="effect">
-          <div class="thumb">暂无示意图</div>
+          <div class="thumb">
+            <img
+              v-if="previews.urls[key(t)]"
+              :src="previews.urls[key(t)]"
+              alt=""
+            />
+            <span v-else>暂无示意图</span>
+          </div>
           <div class="body">
             <strong class="name">{{ effectState(t).name }}</strong>
             <el-tag :type="effectState(t).tone" effect="plain">{{
@@ -89,6 +114,11 @@ h1 {
   font-size: 13px;
   color: var(--el-text-color-placeholder);
   background: var(--el-fill-color-light);
+}
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .body {
   display: flex;
