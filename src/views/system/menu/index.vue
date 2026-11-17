@@ -367,10 +367,10 @@ onMounted(async () => {
             <el-option label="业务大屏" value="closet-dashboard" />
             <el-option label="实时试穿" value="closet-tryon" />
             <el-option
-              label="穿搭创作 · 模板"
+              label="穿搭创作 · 创作效果"
               value="closet-creation-templates" />
             <el-option
-              label="穿搭创作 · 模型能力"
+              label="穿搭创作 · 模型高级设置"
               value="closet-creation-capabilities" />
             <el-option label="穿搭创作 · 用量" value="closet-creation-usage" />
             <el-option

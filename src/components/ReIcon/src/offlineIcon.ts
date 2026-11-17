@@ -7,6 +7,9 @@ import EpHomeFilled from "~icons/ep/home-filled?raw";
 
 // https://icon-sets.iconify.design/ri/?keyword=ri
 import RiSettings3Line from "~icons/ri/settings-3-line?raw";
+import RiImageLine from "~icons/ri/image-line?raw";
+import RiGalleryLine from "~icons/ri/gallery-line?raw";
+import RiBarChartLine from "~icons/ri/bar-chart-line?raw";
 import RiUserSettingsLine from "~icons/ri/user-settings-line?raw";
 import RiShieldKeyholeLine from "~icons/ri/shield-keyhole-line?raw";
 import RiMenuLine from "~icons/ri/menu-line?raw";
@@ -38,6 +41,9 @@ const icons = [
   ["ep/home-filled", EpHomeFilled],
   // Remix Icon: https://github.com/Remix-Design/RemixIcon
   ["ri/settings-3-line", RiSettings3Line],
+  ["ri/image-line", RiImageLine],
+  ["ri/gallery-line", RiGalleryLine],
+  ["ri/bar-chart-line", RiBarChartLine],
   ["ri/user-settings-line", RiUserSettingsLine],
   ["ri/shield-keyhole-line", RiShieldKeyholeLine],
   ["ri/menu-line", RiMenuLine],

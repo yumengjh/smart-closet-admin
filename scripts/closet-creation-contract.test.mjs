@@ -70,6 +70,12 @@ const cases = [
     `${base}/retire`,
     { revision: 4 }
   ],
+  [
+    "getCreationGenerationOptions",
+    [],
+    "get",
+    "/closet/creations/generation-options"
+  ],
   ["getCreationCapabilities", [], "get", "/closet/creations/capabilities"],
   [
     "saveCreationCapability",
@@ -83,6 +89,67 @@ const cases = [
     ["2026-11-01", "2026-11-02"],
     "get",
     "/closet/creations/usage"
+  ],
+  ["getTrialGarments", [], "get", "/closet/creations/trial-garments"],
+  [
+    "getTrialGarmentImage",
+    ["g/1"],
+    "get",
+    "/closet/creations/trial-garments/g%2F1/image"
+  ],
+  ["getTrialPersons", [], "get", "/closet/creations/trial-persons"],
+  [
+    "getTrialPersonImage",
+    ["p1"],
+    "get",
+    "/closet/creations/trial-persons/p1/image"
+  ],
+  ["deleteTrialPerson", ["p1"], "delete", "/closet/creations/trial-persons/p1"],
+  [
+    "startCreationTrial",
+    [id, version, { revision: 3, garmentIds: ["g1"] }],
+    "post",
+    `${base}/versions/${version}/trials`,
+    { revision: 3, garmentIds: ["g1"] }
+  ],
+  ["getCreationTrials", [id], "get", `${base}/trials`],
+  ["getCreationTrial", ["t1"], "get", "/closet/creations/trials/t1"],
+  ["getCreationTrialImage", ["t1"], "get", "/closet/creations/trials/t1/image"],
+  [
+    "getCreationPreviewImage",
+    [id, version],
+    "get",
+    `${base}/versions/${version}/preview-image`
+  ],
+  ["getCreationPromptSamples", [], "get", "/closet/creations/prompt-samples"],
+  [
+    "createCreationEffect",
+    [{ name: "新效果", personRequired: true, sampleKey: "k" }],
+    "post",
+    "/closet/creations/templates",
+    { name: "新效果", personRequired: true, sampleKey: "k" }
+  ],
+  ["deleteCreationEffect", [id], "delete", base],
+  [
+    "reorderCreationEffects",
+    [["b", "a"]],
+    "put",
+    "/closet/creations/templates/order",
+    { ids: ["b", "a"] }
+  ],
+  [
+    "setCreationPreview",
+    [id, version, { trialId: "t1" }],
+    "post",
+    `${base}/versions/${version}/preview`,
+    { trialId: "t1" }
+  ],
+  [
+    "launchCreationVersion",
+    [id, version, { revision: 5, trialId: "t1" }],
+    "post",
+    `${base}/versions/${version}/launch`,
+    { revision: 5, trialId: "t1" }
   ]
 ];
 for (const [name, args, method, path, data] of cases) {
@@ -93,11 +160,14 @@ for (const [name, args, method, path, data] of cases) {
   assert.equal(calls[0][1], path, name);
   if (data)
     assert.equal(JSON.stringify(calls[0][2].data), JSON.stringify(data), name);
+  if (name === "getCreationUsage")
+    assert.equal(
+      JSON.stringify(calls[0][2].params),
+      JSON.stringify({ from: "2026-11-01", to: "2026-11-02" })
+    );
+  if (name.endsWith("Image"))
+    assert.equal(calls[0][2].responseType, "blob", name);
 }
-assert.equal(
-  JSON.stringify(calls[0][2].params),
-  JSON.stringify({ from: "2026-11-01", to: "2026-11-02" })
-);
 await exports.getCreationVersion("sunlit-flatlay", "v/a");
 assert.ok(calls.at(-1)[1].endsWith("v%2Fa"), "version IDs must be encoded");
 
@@ -117,6 +187,56 @@ for (const key of [
       `${key} missing in ${file}`
     );
 }
+
+const readProjectFile = file =>
+  readFile(new URL(file, import.meta.url), "utf8");
+const [creationRoutes, dynamicRoutes, offlineIcons] = await Promise.all([
+  readProjectFile("../src/router/modules/creation.ts"),
+  readProjectFile("../src/router/utils.ts"),
+  readProjectFile("../src/components/ReIcon/src/offlineIcon.ts")
+]);
+assert.ok(
+  creationRoutes.includes('redirect: "/creation/templates"'),
+  "the creation module must open the effects page by default"
+);
+assert.ok(!creationRoutes.includes("Guide.vue"), "guide page is removed");
+
+const creationPages = [
+  ["templates", "closet-creation-templates", "ri/image-line", "Templates.vue"],
+  [
+    "capabilities",
+    "closet-creation-capabilities",
+    "ri/settings-3-line",
+    "Capabilities.vue"
+  ],
+  ["usage", "closet-creation-usage", "ri/bar-chart-line", "Usage.vue"],
+  ["showcases", "closet-creation-showcases", "ri/gallery-line", "Showcases.vue"]
+];
+for (const [route, key, icon, view] of creationPages) {
+  const componentPath = `@/views/integrations/closet/creation/${view}`;
+  assert.ok(
+    creationRoutes.includes(`path: "/creation/${route}"`) &&
+      creationRoutes.includes(componentPath) &&
+      creationRoutes.includes(`icon: "${icon}"`),
+    `static route, component, or icon missing for ${route}`
+  );
+  assert.ok(
+    dynamicRoutes.includes(`"${key}": () =>`) &&
+      dynamicRoutes.includes(componentPath),
+    `dynamic route component missing for ${key}`
+  );
+  const symbol = icon
+    .split("/")[1]
+    .split("-")
+    .map(part => part[0].toUpperCase() + part.slice(1))
+    .join("");
+  const importName = `Ri${symbol}`;
+  assert.ok(
+    offlineIcons.includes(`import ${importName} from "~icons/${icon}?raw";`) &&
+      offlineIcons.includes(`["${icon}", ${importName}]`),
+    `offline icon import or registration missing for ${icon}`
+  );
+}
 console.log(
-  "Creation API: 10 operations and 3 navigation keys verified against recording transport."
+  "Creation API: 28 operations, static/dynamic navigation, and offline icons verified."
 );

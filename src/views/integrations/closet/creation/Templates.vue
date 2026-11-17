@@ -1,414 +1,761 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { ElMessageBox } from "element-plus";
 import {
-  createCreationVersion,
-  getCreationCapabilities,
+  createCreationEffect,
+  deleteCreationEffect,
+  getCreationPreviewImage,
+  getCreationPromptSamples,
   getCreationTemplates,
+  getCreationTrials,
   getCreationVersion,
-  publishCreationVersion,
+  launchCreationVersion,
+  reorderCreationEffects,
   retireCreationTemplate,
-  saveCreationVersion,
-  verifyCreationVersion,
-  type TemplateSummary,
-  type Capability,
-  type VersionDetail,
-  type VersionEdit
+  type PromptSample,
+  type TemplateSummary
 } from "@/api/closet/creation";
 import { useCurrentPermissions } from "@/composables/useCurrentPermissions";
 import { message } from "@/utils/message";
+import EffectEditor from "./EffectEditor.vue";
+import {
+  clearImageCache,
+  effectState,
+  errorText,
+  useBlobImages
+} from "./effectShared";
+
 defineOptions({ name: "ClosetCreationTemplates" });
 const { can } = useCurrentPermissions();
+const canWrite = computed(() => can("closet:creation:write"));
+const canPublish = computed(() => can("closet:creation:publish"));
 const templates = ref<TemplateSummary[]>([]);
-const capabilities = ref<Capability[]>([]);
-const selected = ref<TemplateSummary>();
-const detail = ref<VersionDetail>();
-const form = ref<VersionEdit>();
-const evidence = ref("");
 const loading = ref(false);
-const saving = ref(false);
-const previews = [
-  "sunlit-flatlay",
-  "dual-view-editorial",
-  "daily-outfit-share"
-];
-const isDraft = computed(() => detail.value?.status === "DRAFT");
-const canPublish = computed(
-  () =>
-    !!detail.value &&
-    capabilities.value.some(
-      c =>
-        c.provider === detail.value?.provider &&
-        c.model === detail.value?.model &&
-        c.version === detail.value?.capabilityVersion &&
-        c.verified
-    )
-);
-function fail(e: unknown) {
-  if (e === "cancel" || e === "close") return;
-  const r = (
-    e as { response?: { status?: number; data?: { message?: string } } }
-  ).response;
-  message(
-    r?.status === 409
-      ? "版本已变化，请重新载入后再操作"
-      : r?.data?.message || "请求失败，请重试",
-    { type: "error" }
-  );
-}
+const editing = ref<string>();
+
+// 示意图优先取线上版本，没有线上版本取草稿；取不到就用占位，不提示错误。
+const key = (t: TemplateSummary) => {
+  const v = effectState(t);
+  const id = (v.published ?? v.draft)?.versionId;
+  return id ? `${t.id}|${id}` : "";
+};
+const previews = useBlobImages("preview", k => {
+  const [t, v] = k.split("|");
+  return getCreationPreviewImage(t, v);
+});
+
 async function refresh() {
+  if (!can("closet:creation:read")) return;
   loading.value = true;
   try {
-    const [templateResponse, capabilityResponse] = await Promise.all([
-      getCreationTemplates(),
-      getCreationCapabilities()
-    ]);
-    templates.value = templateResponse.data.items;
-    capabilities.value = capabilityResponse.data.items;
-    if (selected.value)
-      selected.value = templates.value.find(t => t.id === selected.value?.id);
+    templates.value = (await getCreationTemplates()).data.items;
+    templates.value.forEach(t => {
+      const k = key(t);
+      if (k) previews.load(k);
+    });
   } catch (e) {
-    fail(e);
+    message(errorText(e), { type: "error" });
   } finally {
     loading.value = false;
   }
 }
-async function inspect(t: TemplateSummary, id: string) {
+function back() {
+  editing.value = undefined;
+  void refresh();
+}
+
+// 筛选与搜索
+type Filter = "all" | "live" | "draft" | "retired";
+const filter = ref<Filter>("all");
+const keyword = ref("");
+const kindOf = (t: TemplateSummary): Filter => {
+  const label = effectState(t).label;
+  if (label === "已下架") return "retired";
+  return label.startsWith("已上线") ? "live" : "draft";
+};
+const counts = computed(() => {
+  const c = { all: templates.value.length, live: 0, draft: 0, retired: 0 };
+  templates.value.forEach(t => c[kindOf(t)]++);
+  return c;
+});
+const visible = computed(() => {
+  const q = keyword.value.trim().toLowerCase();
+  return templates.value.filter(
+    t =>
+      (filter.value === "all" || kindOf(t) === filter.value) &&
+      (!q || effectState(t).name.toLowerCase().includes(q))
+  );
+});
+const infoLine = (t: TemplateSummary) => {
+  const s = effectState(t);
+  const v = s.published ?? s.draft ?? t.versions[0];
+  if (!v) return "";
+  return `${v.personRequired ? "需要人物" : "不需要人物"} · 最多 ${v.maxGarments} 件`;
+};
+
+// 排序：与当前可见的前一个或后一个交换，立即保存，失败回滚
+const moving = ref(false);
+async function move(id: string, d: number) {
+  const vis = visible.value;
+  const at = vis.findIndex(t => t.id === id);
+  const other = vis[at + d];
+  if (moving.value || !other) return;
+  const before = templates.value;
+  const next = [...before];
+  const i = next.findIndex(t => t.id === id);
+  const j = next.findIndex(t => t.id === other.id);
+  [next[i], next[j]] = [next[j], next[i]];
+  templates.value = next;
+  moving.value = true;
   try {
-    const d = (await getCreationVersion(t.id, id)).data;
-    selected.value = t;
-    detail.value = d;
-    evidence.value = d.evidence || "";
-    form.value = {
-      revision: d.revision,
-      name: d.name,
-      description: d.description,
-      previewAssetId: d.previewAssetId,
-      personRequired: d.personRequired,
-      maxGarments: d.maxGarments,
-      options: { light: [...d.options.light] },
-      prompt: d.prompt,
-      provider: d.provider,
-      model: d.model,
-      capabilityVersion: d.capabilityVersion
-    };
+    templates.value = (
+      await reorderCreationEffects(next.map(t => t.id))
+    ).data.items;
   } catch (e) {
-    fail(e);
+    templates.value = before;
+    message(errorText(e), { type: "error" });
+  } finally {
+    moving.value = false;
   }
 }
-function selectCapability(index: number) {
-  const capability = capabilities.value[index];
-  if (!form.value || !capability) return;
-  form.value.provider = capability.provider;
-  form.value.model = capability.model;
-  form.value.capabilityVersion = capability.version;
-}
-async function action(
-  fn: () => Promise<unknown>,
-  success: string,
-  reload = true
-) {
-  if (saving.value) return;
-  saving.value = true;
+async function ask(text: string, ok = "确认") {
   try {
-    await fn();
-    message(success, { type: "success" });
-    if (reload) {
-      const t = selected.value;
-      const d = detail.value;
-      await refresh();
-      if (t && d) {
-        const fresh = templates.value.find(x => x.id === t.id);
-        if (fresh) await inspect(fresh, d.versionId);
-      }
+    await ElMessageBox.confirm(text, "请确认", {
+      type: "warning",
+      confirmButtonText: ok,
+      cancelButtonText: "取消"
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function command(t: TemplateSummary, c: string) {
+  if (c === "up" || c === "down") return move(t.id, c === "up" ? -1 : 1);
+  try {
+    if (c === "retire") {
+      if (!(await ask("下架后用户不能再选这个效果，已提交的作品不受影响。")))
+        return;
+      await retireCreationTemplate(t.id, t.revision);
+      message("已下架", { type: "success" });
+    } else if (c === "delete") {
+      if (!(await ask("删除后这个效果和它的试做记录都会消失，不能恢复。")))
+        return;
+      await deleteCreationEffect(t.id);
+      message("已删除", { type: "success" });
+    }
+    await refresh();
+  } catch (e) {
+    message(errorText(e), { type: "error" });
+  }
+}
+const menuOf = (t: TemplateSummary) => {
+  const s = effectState(t);
+  return {
+    sort: canWrite.value,
+    retire: canPublish.value && !!s.published && t.enabled,
+    del: canWrite.value && !s.everPublished
+  };
+};
+const hasMenu = (t: TemplateSummary) => Object.values(menuOf(t)).some(Boolean);
+
+// 新建
+const dialog = ref(false);
+const samples = ref<PromptSample[]>([]);
+const sampleKey = ref("");
+// 已经用某个示例建过的效果名，用于在“从哪里开始”里标出来（仍可再建一份）。
+const usedSamples = computed(() => {
+  const used = new Map<string, string[]>();
+  for (const t of templates.value)
+    if (t.sampleKey)
+      used.set(t.sampleKey, [...(used.get(t.sampleKey) ?? []), t.name]);
+  return used;
+});
+const newName = ref("");
+const newPerson = ref(true);
+const creating = ref(false);
+async function openCreate() {
+  sampleKey.value = "";
+  newName.value = "";
+  newPerson.value = true;
+  dialog.value = true;
+  if (!samples.value.length) {
+    try {
+      samples.value = (await getCreationPromptSamples()).data.items;
+    } catch (e) {
+      message(errorText(e), { type: "error" });
+    }
+  }
+}
+function pick(sample?: PromptSample) {
+  sampleKey.value = sample?.key ?? "";
+  if (sample) {
+    newName.value = sample.name;
+    newPerson.value = sample.personRequired;
+  }
+}
+async function create() {
+  if (creating.value) return;
+  if (!newName.value.trim()) {
+    message("请填写名称", { type: "warning" });
+    return;
+  }
+  creating.value = true;
+  try {
+    const d = (
+      await createCreationEffect({
+        name: newName.value.trim(),
+        personRequired: newPerson.value,
+        ...(sampleKey.value ? { sampleKey: sampleKey.value } : {})
+      })
+    ).data;
+    dialog.value = false;
+    editing.value = d.id;
+  } catch (e) {
+    message(errorText(e), { type: "error" });
+  } finally {
+    creating.value = false;
+  }
+}
+
+// 批量管理：前端逐个调用现有接口，串行执行
+type Plan = {
+  t: TemplateSummary;
+  skip: string;
+  run?: () => Promise<unknown>;
+};
+type Outcome = {
+  name: string;
+  status: "成功" | "跳过" | "失败";
+  reason: string;
+};
+const selecting = ref(false);
+const selected = ref<string[]>([]);
+const progress = ref("");
+const busy = computed(() => !!progress.value);
+const report = ref<{ title: string; items: Outcome[] }>();
+const canBulk = computed(() => canWrite.value || canPublish.value);
+function toggleSelect(id: string) {
+  const i = selected.value.indexOf(id);
+  if (i >= 0) selected.value.splice(i, 1);
+  else selected.value.push(id);
+}
+function selectAll() {
+  const ids = visible.value.map(t => t.id);
+  selected.value = ids.every(id => selected.value.includes(id)) ? [] : ids;
+}
+function finishSelecting() {
+  selecting.value = false;
+  selected.value = [];
+}
+const chosen = () => templates.value.filter(t => selected.value.includes(t.id));
+
+async function planLaunch(t: TemplateSummary): Promise<Plan> {
+  const s = effectState(t);
+  const draft = s.draft;
+  if (!draft || draft.status !== "DRAFT")
+    return { t, skip: "没有可上线的草稿" };
+  const d = (await getCreationVersion(t.id, draft.versionId)).data;
+  if (!d.previewImage && !d.previewAssetId) return { t, skip: "缺少示意图" };
+  const trial = (await getCreationTrials(t.id)).data.items.find(
+    x => x.current && x.status === "SUCCEEDED"
+  );
+  if (!trial) return { t, skip: "没有当前内容的成功试做" };
+  return {
+    t,
+    skip: "",
+    run: () =>
+      launchCreationVersion(t.id, d.versionId, {
+        revision: d.revision,
+        trialId: trial.id
+      })
+  };
+}
+const planRetire = (t: TemplateSummary): Plan =>
+  effectState(t).published && t.enabled
+    ? { t, skip: "", run: () => retireCreationTemplate(t.id, t.revision) }
+    : { t, skip: "不是已上线的效果" };
+const planDelete = (t: TemplateSummary): Plan =>
+  effectState(t).everPublished
+    ? { t, skip: "上线过，只能下架" }
+    : { t, skip: "", run: () => deleteCreationEffect(t.id) };
+
+const verbs = { launch: "上线", retire: "下架", delete: "删除" } as const;
+async function bulk(kind: keyof typeof verbs) {
+  const list = chosen();
+  if (!list.length || busy.value) return;
+  const verb = verbs[kind];
+  const plans: Plan[] = [];
+  try {
+    for (const [i, t] of list.entries()) {
+      progress.value = `正在检查 ${i + 1}/${list.length}`;
+      plans.push(
+        kind === "launch"
+          ? await planLaunch(t)
+          : kind === "retire"
+            ? planRetire(t)
+            : planDelete(t)
+      );
     }
   } catch (e) {
-    fail(e);
-  } finally {
-    saving.value = false;
+    progress.value = "";
+    message(errorText(e), { type: "error" });
+    return;
   }
+  progress.value = "";
+  const todo = plans.filter(p => p.run);
+  const out: Outcome[] = plans
+    .filter(p => !p.run)
+    .map(p => ({
+      name: effectState(p.t).name,
+      status: "跳过",
+      reason: p.skip
+    }));
+  if (todo.length) {
+    const tip = {
+      launch: "上线后用户就能使用这些效果。",
+      retire: "下架后用户不能再选这些效果，已提交的作品不受影响。",
+      delete: "删除后这些效果和它们的试做记录都会消失，不能恢复。"
+    }[kind];
+    if (
+      !(await ask(
+        `批量${verb}：将处理 ${todo.length} 个，将跳过 ${out.length} 个。${tip}`,
+        `${verb} ${todo.length} 个`
+      ))
+    )
+      return;
+  }
+  for (const [i, p] of todo.entries()) {
+    progress.value = `正在处理 ${i + 1}/${todo.length}`;
+    const name = effectState(p.t).name;
+    try {
+      await p.run!();
+      out.push({ name, status: "成功", reason: "" });
+    } catch (e) {
+      const r = (e as { response?: { status?: number } }).response;
+      const text = errorText(e, true);
+      if (kind === "delete" && r?.status === 409)
+        out.push({ name, status: "跳过", reason: text });
+      else out.push({ name, status: "失败", reason: text });
+    }
+  }
+  progress.value = "";
+  report.value = { title: `批量${verb}`, items: out };
+  selected.value = [];
+  await refresh();
 }
-async function copy(t: TemplateSummary, v: string | null) {
-  if (!can("closet:creation:write")) return;
-  await action(
-    async () => {
-      const d = (await createCreationVersion(t.id, v)).data;
-      await refresh();
-      const fresh = templates.value.find(x => x.id === t.id);
-      if (fresh) await inspect(fresh, d.versionId);
-    },
-    "草稿已创建",
-    false
+const summary = computed(() => {
+  const items = report.value?.items ?? [];
+  const ok = items.filter(i => i.status === "成功").length;
+  const skip = items.filter(i => i.status === "跳过");
+  const fail = items.filter(i => i.status === "失败").length;
+  const reasons = [...new Set(skip.map(i => i.reason))].join("、");
+  return (
+    `成功 ${ok} 个，跳过 ${skip.length} 个` +
+    (skip.length ? `（${reasons}）` : "") +
+    (fail ? `，失败 ${fail} 个` : "")
   );
-}
-async function save() {
-  if (
-    !detail.value ||
-    !form.value ||
-    !isDraft.value ||
-    !can("closet:creation:write")
-  )
-    return;
-  if (!form.value.options.light.includes("DEFAULT")) {
-    message("光线选项必须包含默认", { type: "warning" });
-    return;
-  }
-  await action(
-    () =>
-      saveCreationVersion(
-        detail.value!.id,
-        detail.value!.versionId,
-        form.value!
-      ),
-    "草稿已保存"
-  );
-}
-async function verify() {
-  if (!detail.value || !can("closet:creation:write")) return;
-  if (evidence.value.trim().length < 20) {
-    message("验证证据至少 20 字", { type: "warning" });
-    return;
-  }
-  await action(
-    () =>
-      verifyCreationVersion(
-        detail.value!.id,
-        detail.value!.versionId,
-        detail.value!.revision,
-        evidence.value.trim()
-      ),
-    "验证记录已保存"
-  );
-}
-async function publish() {
-  if (!detail.value || !can("closet:creation:publish") || !canPublish.value)
-    return;
-  try {
-    await ElMessageBox.confirm(
-      "确认发布此版本？服务端将核验模型能力、证据与预览。",
-      "发布模板",
-      { type: "warning" }
-    );
-  } catch {
-    return;
-  }
-  await action(
-    () =>
-      publishCreationVersion(
-        detail.value!.id,
-        detail.value!.versionId,
-        detail.value!.revision
-      ),
-    "模板已发布"
-  );
-}
-async function retire(t: TemplateSummary) {
-  if (!can("closet:creation:publish")) return;
-  try {
-    await ElMessageBox.confirm(
-      "下架后将停止新的创作提交，已提交任务继续执行。",
-      "下架模板",
-      { type: "warning" }
-    );
-  } catch {
-    return;
-  }
-  await action(() => retireCreationTemplate(t.id, t.revision), "模板已下架");
-}
-onMounted(() => {
-  if (can("closet:creation:read")) void refresh();
 });
+
+onMounted(refresh);
+onBeforeUnmount(clearImageCache);
 </script>
+
 <template>
   <section class="creation-page">
-    <h1>穿搭创作模板</h1>
-    <p class="caption">
-      编辑草稿、记录验证证据并发布。已发布内容通过复制新版本修改。
-    </p>
-    <el-button @click="refresh">刷新</el-button>
-    <el-row :gutter="16" class="content">
-      <el-col :xs="24" :lg="10"
-        ><div v-loading="loading">
-          <el-card
-            v-for="t in templates"
-            :key="t.id"
-            class="template-card"
-            shadow="never"
-          >
-            <template #header
-              ><div class="row">
-                <strong>{{ t.id }}</strong
-                ><el-tag :type="t.enabled ? 'success' : 'info'">{{
-                  t.enabled ? "已启用" : "未启用"
-                }}</el-tag>
-              </div></template
+    <EffectEditor v-if="editing" :template-id="editing" @back="back" />
+    <template v-else>
+      <div class="top">
+        <div class="titles">
+          <h1>创作效果</h1>
+          <p class="caption">每个效果上线前，先试做一张看看效果。</p>
+        </div>
+        <div class="tools">
+          <el-radio-group v-model="filter" size="small">
+            <el-radio-button value="all">全部 {{ counts.all }}</el-radio-button>
+            <el-radio-button value="live"
+              >已上线 {{ counts.live }}</el-radio-button
             >
-            <div v-for="v in t.versions" :key="v.versionId" class="version">
-              <el-button link type="primary" @click="inspect(t, v.versionId)"
-                >版本 {{ v.version }} · {{ v.name }}</el-button
-              ><span>{{ v.status }}</span
-              ><el-button
-                v-if="can('closet:creation:write')"
-                link
-                @click="copy(t, v.versionId)"
-                >复制</el-button
-              >
-            </div>
-            <div class="actions">
-              <el-button
-                v-if="can('closet:creation:write')"
-                size="small"
-                @click="copy(t, null)"
-                >新建草稿</el-button
-              ><el-button
-                v-if="can('closet:creation:publish') && t.enabled"
-                size="small"
-                @click="retire(t)"
-                >下架</el-button
-              >
-            </div>
-          </el-card>
-        </div></el-col
+            <el-radio-button value="draft"
+              >未上线 {{ counts.draft }}</el-radio-button
+            >
+            <el-radio-button value="retired"
+              >已下架 {{ counts.retired }}</el-radio-button
+            >
+          </el-radio-group>
+          <el-input
+            v-model="keyword"
+            class="search"
+            clearable
+            placeholder="搜索名称"
+          />
+          <el-button
+            v-if="canBulk && !selecting"
+            :disabled="!templates.length"
+            @click="selecting = true"
+            >批量管理</el-button
+          >
+          <el-button v-if="canWrite" type="primary" @click="openCreate"
+            >新建效果</el-button
+          >
+        </div>
+      </div>
+
+      <div v-if="selecting" class="bar">
+        <span>已选 {{ selected.length }} 个</span>
+        <el-button link type="primary" :disabled="busy" @click="selectAll"
+          >全选</el-button
+        >
+        <el-button
+          v-if="canPublish"
+          size="small"
+          :disabled="busy || !selected.length"
+          @click="bulk('launch')"
+          >批量上线</el-button
+        >
+        <el-button
+          v-if="canPublish"
+          size="small"
+          :disabled="busy || !selected.length"
+          @click="bulk('retire')"
+          >批量下架</el-button
+        >
+        <el-button
+          v-if="canWrite"
+          size="small"
+          :disabled="busy || !selected.length"
+          @click="bulk('delete')"
+          >批量删除</el-button
+        >
+        <span v-if="progress" class="progress">{{ progress }}</span>
+        <el-button
+          class="done"
+          size="small"
+          :disabled="busy"
+          @click="finishSelecting"
+          >完成</el-button
+        >
+      </div>
+
+      <el-alert
+        v-if="report"
+        class="report"
+        :title="`${report.title}：${summary}`"
+        :type="
+          report.items.some(i => i.status === '失败') ? 'warning' : 'success'
+        "
+        @close="report = undefined"
       >
-      <el-col :xs="24" :lg="14"
-        ><el-card v-if="detail && form" shadow="never">
-          <template #header
-            ><div class="row">
-              <strong>{{ detail.name }} · 版本 {{ detail.version }}</strong
-              ><el-tag>{{ detail.status }}</el-tag>
-            </div></template
-          >
-          <el-form
-            label-position="top"
-            :disabled="!isDraft || !can('closet:creation:write') || saving"
-          >
-            <el-form-item label="名称"
-              ><el-input v-model="form.name"
-            /></el-form-item>
-            <el-form-item label="说明"
-              ><el-input v-model="form.description" type="textarea"
-            /></el-form-item>
-            <el-form-item label="公开示意素材"
-              ><el-select v-model="form.previewAssetId" class="full"
-                ><el-option
-                  v-for="p in previews"
-                  :key="p"
-                  :label="p"
-                  :value="p" /></el-select
-            ></el-form-item>
-            <el-form-item label="需要形象"
-              ><el-switch v-model="form.personRequired"
-            /></el-form-item>
-            <el-form-item label="衣物数量上限"
-              ><el-input-number v-model="form.maxGarments" :min="1" :max="12"
-            /></el-form-item>
-            <el-form-item label="光线选项"
-              ><el-checkbox-group v-model="form.options.light"
-                ><el-checkbox value="DEFAULT" disabled>默认</el-checkbox
-                ><el-checkbox value="WARM">暖光</el-checkbox
-                ><el-checkbox value="COOL">冷光</el-checkbox></el-checkbox-group
-              ></el-form-item
-            >
-            <el-form-item label="提示词"
-              ><el-input v-model="form.prompt" type="textarea" :rows="6"
-            /></el-form-item>
-            <el-form-item label="模型能力">
-              <el-select
-                class="full"
-                placeholder="选择已登记能力"
-                @change="selectCapability"
+        <el-collapse>
+          <el-collapse-item title="查看每个效果的结果">
+            <div v-for="(i, n) in report.items" :key="n" class="result">
+              {{ i.name }} · {{ i.status
+              }}{{ i.reason ? `（${i.reason}）` : "" }}
+            </div>
+          </el-collapse-item>
+        </el-collapse>
+      </el-alert>
+
+      <el-empty
+        v-if="!loading && !templates.length"
+        description="还没有效果，点右上角新建一个"
+      />
+      <el-empty
+        v-else-if="!loading && !visible.length"
+        description="没有符合条件的效果"
+      />
+      <div v-loading="loading" class="effects">
+        <article
+          v-for="t in visible"
+          :key="t.id"
+          class="effect"
+          :class="{ picked: selected.includes(t.id) }"
+          @click="selecting && toggleSelect(t.id)"
+        >
+          <div class="thumb">
+            <img
+              v-if="previews.urls[key(t)]"
+              :src="previews.urls[key(t)]"
+              alt=""
+            />
+            <span v-else>暂无示意图</span>
+            <el-checkbox
+              v-if="selecting"
+              class="check"
+              :model-value="selected.includes(t.id)"
+              @click.stop
+              @change="toggleSelect(t.id)"
+            />
+          </div>
+          <div class="body">
+            <strong class="name" :title="effectState(t).name">{{
+              effectState(t).name
+            }}</strong>
+            <el-tag size="small" :type="effectState(t).tone" effect="plain">{{
+              effectState(t).label
+            }}</el-tag>
+            <span class="info">{{ infoLine(t) }}</span>
+            <div class="ops">
+              <el-button
+                size="small"
+                :disabled="selecting"
+                @click.stop="editing = t.id"
+                >{{ canWrite ? "编辑" : "查看" }}</el-button
               >
-                <el-option
-                  v-for="(c, i) in capabilities"
-                  :key="`${c.provider}/${c.model}/${c.version}`"
-                  :value="i"
-                  :label="`${c.provider} / ${c.model} · v${c.version} · ${c.verified ? '已验证' : '未验证'}`"
-                />
-              </el-select>
-              <span class="caption"
-                >当前：{{ form.provider || "未选择" }} /
-                {{ form.model || "未选择" }} · 版本
-                {{ form.capabilityVersion ?? "—" }}</span
+              <el-dropdown
+                v-if="hasMenu(t) && !selecting"
+                trigger="click"
+                @command="(c: string) => command(t, c)"
               >
-            </el-form-item>
-            <el-button
-              v-if="isDraft && can('closet:creation:write')"
-              type="primary"
-              :loading="saving"
-              @click="save"
-              >保存草稿</el-button
-            >
-          </el-form>
-          <el-divider />
-          <el-form-item
-            label="人工验证证据（至少 20 字，不填私人路径或图片地址）"
-            ><el-input
-              v-model="evidence"
-              type="textarea"
-              :rows="3"
-              :disabled="!isDraft || !can('closet:creation:write')"
-          /></el-form-item>
-          <el-button
-            v-if="isDraft && can('closet:creation:write')"
-            :loading="saving"
-            @click="verify"
-            >记录验证</el-button
+                <el-button size="small" aria-label="更多操作">⋯</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <template v-if="menuOf(t).sort">
+                      <el-dropdown-item
+                        command="up"
+                        :disabled="visible[0]?.id === t.id"
+                        >上移</el-dropdown-item
+                      >
+                      <el-dropdown-item
+                        command="down"
+                        :disabled="visible[visible.length - 1]?.id === t.id"
+                        >下移</el-dropdown-item
+                      >
+                    </template>
+                    <el-dropdown-item v-if="menuOf(t).retire" command="retire"
+                      >下架</el-dropdown-item
+                    >
+                    <el-dropdown-item v-if="menuOf(t).del" command="delete"
+                      >删除</el-dropdown-item
+                    >
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+          </div>
+        </article>
+      </div>
+    </template>
+    <el-dialog v-model="dialog" title="新建效果" width="min(560px, 92vw)">
+      <div class="label">从哪里开始</div>
+      <div class="starts">
+        <div
+          class="start"
+          :class="{ on: !sampleKey }"
+          role="radio"
+          tabindex="0"
+          :aria-checked="!sampleKey"
+          @click="pick()"
+          @keydown.enter.space.prevent="pick()"
+        >
+          <strong>从空白开始</strong>
+        </div>
+        <div
+          v-for="x in samples"
+          :key="x.key"
+          class="start"
+          :class="{ on: sampleKey === x.key }"
+          role="radio"
+          tabindex="0"
+          :aria-checked="sampleKey === x.key"
+          @click="pick(x)"
+          @keydown.enter.space.prevent="pick(x)"
+        >
+          <strong>{{ x.name }}</strong>
+          <span class="hint">{{
+            x.personRequired ? "需要人物" : "不需要人物"
+          }}</span>
+          <el-tag
+            v-if="usedSamples.has(x.key)"
+            size="small"
+            type="info"
+            class="used"
+            :title="`已用于：${usedSamples.get(x.key)!.join('、')}`"
+            >已用过</el-tag
           >
-          <el-button
-            v-if="
-              detail.status === 'VERIFIED' && can('closet:creation:publish')
-            "
-            type="primary"
-            :loading="saving"
-            :disabled="!canPublish"
-            @click="publish"
-            >发布版本</el-button
-          >
-          <p v-if="detail.status === 'VERIFIED' && !canPublish" class="caption">
-            模型能力未验证或版本已变化，请核对后重新验证模板。
-          </p> </el-card
-        ><el-empty v-else description="选择一个版本查看详情"
-      /></el-col>
-    </el-row>
+        </div>
+      </div>
+      <el-form label-position="top" class="new-form">
+        <el-form-item label="名称">
+          <el-input v-model="newName" maxlength="40" show-word-limit />
+        </el-form-item>
+        <el-form-item label="需要人物">
+          <el-switch v-model="newPerson" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialog = false">取消</el-button>
+        <el-button type="primary" :loading="creating" @click="create"
+          >创建并编辑</el-button
+        >
+      </template>
+    </el-dialog>
   </section>
 </template>
+
 <style scoped>
 .creation-page {
   padding: 24px;
 }
+h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+}
 .caption {
+  margin: 0 0 16px;
   color: var(--el-text-color-secondary);
 }
-.content {
-  margin-top: 20px;
-}
-.template-card {
-  margin-bottom: 16px;
-}
-.row,
-.version,
-.actions {
+.top {
   display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.row {
-  justify-content: space-between;
-}
-.version {
   flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 8px;
 }
-.actions {
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.search {
+  width: 180px;
+}
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: var(--el-fill-color-light);
+  border-radius: 6px;
+}
+.progress {
+  font-size: 13px;
+  color: var(--el-color-primary);
+}
+.done {
+  margin-left: auto;
+}
+.report {
+  margin-bottom: 12px;
+}
+.result {
+  font-size: 13px;
+  line-height: 1.8;
+}
+.label {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.hint {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+.starts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.start .used {
+  align-self: flex-start;
+}
+.start {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  cursor: pointer;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 6px;
+}
+.start.on {
+  border-color: var(--el-color-primary);
+  box-shadow: 0 0 0 1px var(--el-color-primary);
+}
+.new-form {
   margin-top: 16px;
 }
-.full {
-  width: 100%;
+.effects {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  min-height: 80px;
 }
-@media (max-width: 600px) {
+.effect {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 6px;
+}
+.effect.picked {
+  border-color: var(--el-color-primary);
+  box-shadow: 0 0 0 1px var(--el-color-primary);
+}
+.thumb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-height: 240px;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--el-text-color-placeholder);
+  background: var(--el-fill-color-light);
+}
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.check {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+}
+.body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  padding: 8px 10px 10px;
+}
+.name {
+  flex: 1 1 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.info {
+  flex: 1 1 100%;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.ops {
+  display: flex;
+  flex: 1 1 100%;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+@media (width <= 600px) {
   .creation-page {
     padding: 16px;
+  }
+  .effects {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .search {
+    flex: 1 1 140px;
   }
 }
 </style>
