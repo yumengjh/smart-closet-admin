@@ -163,6 +163,14 @@ const hasMenu = (t: TemplateSummary) => Object.values(menuOf(t)).some(Boolean);
 const dialog = ref(false);
 const samples = ref<PromptSample[]>([]);
 const sampleKey = ref("");
+// 已经用某个示例建过的效果名，用于在“从哪里开始”里标出来（仍可再建一份）。
+const usedSamples = computed(() => {
+  const used = new Map<string, string[]>();
+  for (const t of templates.value)
+    if (t.sampleKey)
+      used.set(t.sampleKey, [...(used.get(t.sampleKey) ?? []), t.name]);
+  return used;
+});
 const newName = ref("");
 const newPerson = ref(true);
 const creating = ref(false);
@@ -557,6 +565,14 @@ onBeforeUnmount(clearImageCache);
           <span class="hint">{{
             x.personRequired ? "需要人物" : "不需要人物"
           }}</span>
+          <el-tag
+            v-if="usedSamples.has(x.key)"
+            size="small"
+            type="info"
+            class="used"
+            :title="`已用于：${usedSamples.get(x.key)!.join('、')}`"
+            >已用过</el-tag
+          >
         </div>
       </div>
       <el-form label-position="top" class="new-form">
@@ -643,6 +659,9 @@ h1 {
   gap: 8px;
   max-height: 260px;
   overflow-y: auto;
+}
+.start .used {
+  align-self: flex-start;
 }
 .start {
   display: flex;

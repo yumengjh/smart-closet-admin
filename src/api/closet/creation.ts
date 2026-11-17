@@ -49,6 +49,8 @@ export type TemplateSummary = {
   sortOrder: number;
   publishedVersionId: string | null;
   versions: VersionSummary[];
+  /** 起步示例；空白新建为 null。 */
+  sampleKey: string | null;
 };
 export type VersionDetail = VersionSummary & {
   id: string;
