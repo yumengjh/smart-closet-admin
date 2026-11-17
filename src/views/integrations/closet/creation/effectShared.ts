@@ -7,6 +7,7 @@ export type EffectState = {
   name: string;
   published?: VersionSummary;
   draft?: VersionSummary;
+  everPublished: boolean;
 };
 
 // 线上版本、待上线草稿与展示状态都由版本列表推出。
@@ -21,9 +22,17 @@ export function effectState(t: TemplateSummary): EffectState {
   const everPublished = versions.some(
     v => v.status === "PUBLISHED" || v.status === "RETIRED" || v.publishedAtMs
   );
-  const name = (published ?? draft ?? versions[0])?.name || "未命名效果";
+  const name =
+    t.name || (published ?? draft ?? versions[0])?.name || "未命名效果";
   if (!t.enabled && everPublished)
-    return { label: "已下架", tone: "info", name, published, draft };
+    return {
+      label: "已下架",
+      tone: "info",
+      name,
+      published,
+      draft,
+      everPublished
+    };
   if (published)
     return draft
       ? {
@@ -31,10 +40,25 @@ export function effectState(t: TemplateSummary): EffectState {
           tone: "warning",
           name,
           published,
-          draft
+          draft,
+          everPublished
         }
-      : { label: "已上线", tone: "success", name, published, draft };
-  return { label: "未上线", tone: "info", name, published, draft };
+      : {
+          label: "已上线",
+          tone: "success",
+          name,
+          published,
+          draft,
+          everPublished
+        };
+  return {
+    label: "未上线",
+    tone: "info",
+    name,
+    published,
+    draft,
+    everPublished
+  };
 }
 
 export const versionStatusText: Record<string, string> = {

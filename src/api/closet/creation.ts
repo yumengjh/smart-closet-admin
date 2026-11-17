@@ -43,6 +43,7 @@ export type VersionSummary = {
 };
 export type TemplateSummary = {
   id: string;
+  name: string;
   revision: number;
   enabled: boolean;
   sortOrder: number;
@@ -268,3 +269,40 @@ export const getCreationPreviewImage = (id: string, v: string) =>
   http.request<Blob>("get", `${version(id, v)}/preview-image`, {
     responseType: "blob"
   });
+export type PromptSample = {
+  key: string;
+  name: string;
+  description: string;
+  personRequired: boolean;
+  maxGarments: number;
+  light: string[];
+  prompt: string;
+};
+export type NewEffect = {
+  name: string;
+  description?: string;
+  personRequired: boolean;
+  maxGarments?: number;
+  light?: string[];
+  prompt?: string;
+  sampleKey?: string;
+};
+export const getCreationPromptSamples = () =>
+  http.request<ApiResponse<{ items: PromptSample[] }>>(
+    "get",
+    `${root}/prompt-samples`
+  );
+export const createCreationEffect = (data: NewEffect) =>
+  http.request<ApiResponse<VersionDetail & { id: string }>>(
+    "post",
+    `${root}/templates`,
+    { data }
+  );
+export const deleteCreationEffect = (id: string) =>
+  http.request<ApiResponse<{ deleted: boolean }>>("delete", template(id));
+export const reorderCreationEffects = (ids: string[]) =>
+  http.request<ApiResponse<{ items: TemplateSummary[] }>>(
+    "put",
+    `${root}/templates/order`,
+    { data: { ids } }
+  );

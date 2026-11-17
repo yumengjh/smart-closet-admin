@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { ElMessageBox } from "element-plus";
 import {
   createCreationVersion,
+  deleteCreationEffect,
   getCreationGenerationOptions,
   getCreationPreviewImage,
   getCreationTemplates,
@@ -45,6 +46,7 @@ const form = reactive({
   name: "",
   description: "",
   maxGarments: 1,
+  personRequired: false,
   lights: [] as string[],
   prompt: "",
   modelKey: ""
@@ -76,6 +78,7 @@ const snapshot = () =>
     form.name,
     form.description,
     form.maxGarments,
+    form.personRequired,
     [...form.lights].sort(),
     form.prompt,
     form.modelKey
@@ -115,6 +118,10 @@ const blockReason = computed(() => {
   if (dirty.value) return "先保存改动";
   return "";
 });
+const noPreview = computed(
+  () =>
+    !!detail.value && !detail.value.previewImage && !detail.value.previewAssetId
+);
 const readyTrial = computed(() =>
   trials.value.find(t => t.current && t.status === "SUCCEEDED")
 );
@@ -127,6 +134,7 @@ function fill(d: VersionDetail) {
   form.name = d.name;
   form.description = d.description;
   form.maxGarments = d.maxGarments;
+  form.personRequired = d.personRequired;
   form.lights = d.options.light.filter(l => l !== "DEFAULT");
   form.prompt = d.prompt;
   form.modelKey = d.provider && d.model ? keyOf(d.provider, d.model) : "";
@@ -194,6 +202,10 @@ async function modify(from: string | null) {
 async function save() {
   const d = detail.value;
   if (!d || !canEdit.value || busy.value) return;
+  if (!form.prompt.trim()) {
+    message("请填写提示词", { type: "warning" });
+    return;
+  }
   const choice = choices.value.find(c => c.key === form.modelKey);
   const saved = ref<VersionDetail>();
   const ok = await run(async () => {
@@ -203,7 +215,7 @@ async function save() {
         name: form.name.trim(),
         description: form.description.trim(),
         previewAssetId: d.previewAssetId,
-        personRequired: d.personRequired,
+        personRequired: form.personRequired,
         maxGarments: form.maxGarments,
         options: { light: ["DEFAULT", ...form.lights] },
         prompt: form.prompt,
@@ -218,7 +230,7 @@ async function save() {
 async function launch(trial?: Trial) {
   const t = trial ?? readyTrial.value;
   const d = detail.value;
-  if (!t || !d || !canPublish.value || dirty.value) return;
+  if (!t || !d || !canPublish.value || dirty.value || noPreview.value) return;
   if (!(await confirm("上线后用户就能使用这个效果。确认上线？"))) return;
   if (
     await run(
@@ -233,6 +245,13 @@ async function launch(trial?: Trial) {
     trials.value = [];
     await load();
   }
+}
+async function remove() {
+  if (!canWrite.value) return;
+  if (!(await confirm("删除后这个效果和它的试做记录都会消失，不能恢复。")))
+    return;
+  if (await run(() => deleteCreationEffect(props.templateId), "已删除"))
+    emit("back");
 }
 async function retire() {
   const t = summary.value;
@@ -266,6 +285,19 @@ onMounted(async () => {
           @click="retire"
           >下架</el-button
         >
+        <el-dropdown
+          v-if="!state.everPublished && canWrite"
+          :class="{ end: !(state.published && summary.enabled && canPublish) }"
+          trigger="click"
+          @command="remove"
+        >
+          <el-button aria-label="更多操作">⋯</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="delete">删除效果</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </header>
 
       <div v-if="!editable" class="readonly-bar">
@@ -342,8 +374,9 @@ onMounted(async () => {
             />
           </el-form-item>
           <el-form-item label="需要人物">
-            <span>{{
-              detail.personRequired ? "需要选择形象" : "不需要人物"
+            <el-switch v-model="form.personRequired" />
+            <span class="hint side">{{
+              form.personRequired ? "需要选择形象" : "不需要人物"
             }}</span>
           </el-form-item>
           <el-form-item label="衣物最多几件">
@@ -393,7 +426,7 @@ onMounted(async () => {
             :version="detail"
             :can-start="canWrite"
             :can-set-preview="canWrite"
-            :can-launch="canPublish && !dirty"
+            :can-launch="canPublish && !dirty && !noPreview"
             :block-reason="blockReason"
             @changed="load(true)"
             @launch="launch"
@@ -406,14 +439,16 @@ onMounted(async () => {
             {{
               dirty
                 ? "先保存改动，再用当前内容试做。"
-                : readyTrial
-                  ? "用最新一张成功的试做上线。"
-                  : "先用当前内容试做成功一张"
+                : noPreview
+                  ? "先把一张满意的试做设为示意图"
+                  : readyTrial
+                    ? "用最新一张成功的试做上线。"
+                    : "先用当前内容试做成功一张"
             }}
           </p>
           <el-button
             type="primary"
-            :disabled="!readyTrial || dirty || busy"
+            :disabled="!readyTrial || dirty || noPreview || busy"
             @click="launch()"
             >上线</el-button
           >
@@ -514,6 +549,9 @@ onMounted(async () => {
   object-fit: cover;
   background: var(--el-fill-color-light);
   border-radius: 4px;
+}
+.side {
+  margin: 0 0 0 8px;
 }
 .save-row {
   display: flex;

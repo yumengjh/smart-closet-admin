@@ -121,6 +121,22 @@ const cases = [
     "get",
     `${base}/versions/${version}/preview-image`
   ],
+  ["getCreationPromptSamples", [], "get", "/closet/creations/prompt-samples"],
+  [
+    "createCreationEffect",
+    [{ name: "新效果", personRequired: true, sampleKey: "k" }],
+    "post",
+    "/closet/creations/templates",
+    { name: "新效果", personRequired: true, sampleKey: "k" }
+  ],
+  ["deleteCreationEffect", [id], "delete", base],
+  [
+    "reorderCreationEffects",
+    [["b", "a"]],
+    "put",
+    "/closet/creations/templates/order",
+    { ids: ["b", "a"] }
+  ],
   [
     "setCreationPreview",
     [id, version, { trialId: "t1" }],
@@ -222,5 +238,5 @@ for (const [route, key, icon, view] of creationPages) {
   );
 }
 console.log(
-  "Creation API: 24 operations, static/dynamic navigation, and offline icons verified."
+  "Creation API: 28 operations, static/dynamic navigation, and offline icons verified."
 );

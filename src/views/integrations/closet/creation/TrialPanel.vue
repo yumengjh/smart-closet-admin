@@ -144,6 +144,10 @@ watch(
 watch(persons, list => list.forEach(p => personImages.load(p.id)), {
   immediate: true
 });
+watch(needPerson, on => {
+  if (on && !personId.value && persons.value.length)
+    personId.value = persons.value[0].id;
+});
 onBeforeUnmount(() => {
   if (timer) clearInterval(timer);
   observer?.disconnect();
