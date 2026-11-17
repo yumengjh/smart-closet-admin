@@ -71,35 +71,75 @@ export function errorText(e: unknown, keepServerOn409 = false) {
   const r = (
     e as { response?: { status?: number; data?: { message?: string } } }
   ).response;
+  if (r?.status === 429) return "请求太频繁，请稍等几秒再试";
   if (r?.status === 409 && !(keepServerOn409 && r.data?.message))
     return "内容已被别人改过，请刷新后再试";
   return r?.data?.message || "请求失败，请重试";
 }
 
-// 带鉴权取回的图片转成 object URL，组件卸载时统一释放。
-export function useBlobImages(fetcher: (id: string) => Promise<Blob>) {
+// 带鉴权取回的图片：全局最多 4 个并发，同一张图在页面生命周期内只取一次。
+const cache = new Map<string, string>();
+const queue: Array<() => Promise<void>> = [];
+let running = 0;
+let generation = 0;
+function pump() {
+  while (running < 4 && queue.length) {
+    const task = queue.shift()!;
+    running++;
+    void task().finally(() => {
+      running--;
+      pump();
+    });
+  }
+}
+// 离开创作页时统一释放缓存里的 object URL。
+export function clearImageCache() {
+  generation++;
+  queue.length = 0;
+  cache.forEach(url => URL.revokeObjectURL(url));
+  cache.clear();
+}
+
+export function useBlobImages(
+  kind: string,
+  fetcher: (id: string) => Promise<Blob>
+) {
   const urls = reactive<Record<string, string>>({});
   const pending = new Set<string>();
   let dead = false;
+  const full = (id: string) => `${kind}:${id}`;
   function load(id: string) {
     if (id in urls || pending.has(id)) return;
+    const hit = cache.get(full(id));
+    if (hit) {
+      urls[id] = hit;
+      return;
+    }
     pending.add(id);
-    fetcher(id)
-      .then(blob => {
-        if (!dead) urls[id] = URL.createObjectURL(blob);
-      })
-      .catch(() => {
+    const born = generation;
+    queue.push(async () => {
+      try {
+        const blob = await fetcher(id);
+        const url = URL.createObjectURL(blob);
+        if (born !== generation) URL.revokeObjectURL(url);
+        else cache.set(full(id), url);
+        if (!dead && born === generation) urls[id] = url;
+      } catch {
         if (!dead) urls[id] = "";
-      })
-      .finally(() => pending.delete(id));
+      } finally {
+        pending.delete(id);
+      }
+    });
+    pump();
   }
   function drop(id: string) {
-    if (urls[id]) URL.revokeObjectURL(urls[id]);
+    const url = cache.get(full(id));
+    if (url) URL.revokeObjectURL(url);
+    cache.delete(full(id));
     delete urls[id];
   }
   onBeforeUnmount(() => {
     dead = true;
-    Object.values(urls).forEach(u => u && URL.revokeObjectURL(u));
   });
   return { urls, load, drop };
 }

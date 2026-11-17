@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessageBox } from "element-plus";
 import {
@@ -24,6 +24,7 @@ import {
   effectState,
   errorText,
   lightText,
+  useBlobImages,
   versionStatusText
 } from "./effectShared";
 
@@ -49,32 +50,22 @@ const form = reactive({
   modelKey: ""
 });
 const base = ref("");
-const previewUrl = ref("");
-let previewSerial = 0;
-async function loadPreview() {
-  const d = detail.value;
-  const serial = ++previewSerial;
-  let url = "";
-  if (d?.previewImage) {
-    try {
-      url = URL.createObjectURL(
-        await getCreationPreviewImage(props.templateId, d.versionId)
-      );
-    } catch {
-      // 没有示意图时按空处理
-    }
-  }
-  if (serial !== previewSerial) {
-    if (url) URL.revokeObjectURL(url);
-    return;
-  }
-  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
-  previewUrl.value = url;
-}
-onBeforeUnmount(() => {
-  previewSerial++;
-  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
+const previews = useBlobImages("preview", k => {
+  const [t, v] = k.split("|");
+  return getCreationPreviewImage(t, v);
 });
+const previewKey = computed(() =>
+  detail.value?.previewImage
+    ? `${props.templateId}|${detail.value.versionId}`
+    : ""
+);
+const previewUrl = computed(() => previews.urls[previewKey.value] ?? "");
+function loadPreview(fresh: boolean) {
+  const k = previewKey.value;
+  if (!k) return;
+  if (fresh) previews.drop(k);
+  previews.load(k);
+}
 
 const keyOf = (provider: string, model: string) => `${provider}\n${model}`;
 const state = computed(() => effectState(summary.value!));
@@ -144,7 +135,7 @@ function fill(d: VersionDetail) {
   if (d.status === "DRAFT" && !form.modelKey && def)
     form.modelKey = keyOf(def.provider, def.model);
 }
-async function load() {
+async function load(fresh = false) {
   loading.value = true;
   try {
     const list = (await getCreationTemplates()).data.items;
@@ -160,7 +151,7 @@ async function load() {
   } finally {
     loading.value = false;
   }
-  void loadPreview();
+  loadPreview(fresh);
 }
 async function run(fn: () => Promise<unknown>, success: string) {
   if (busy.value) return false;
@@ -404,7 +395,7 @@ onMounted(async () => {
             :can-set-preview="canWrite"
             :can-launch="canPublish && !dirty"
             :block-reason="blockReason"
-            @changed="load"
+            @changed="load(true)"
             @launch="launch"
           />
         </section>

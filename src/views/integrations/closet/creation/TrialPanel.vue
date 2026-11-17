@@ -43,9 +43,9 @@ const light = ref<TrialLight>("DEFAULT");
 const pose = ref("");
 const starting = ref(false);
 const busy = ref(false);
-const garmentImages = useBlobImages(getTrialGarmentImage);
-const personImages = useBlobImages(getTrialPersonImage);
-const trialImages = useBlobImages(getCreationTrialImage);
+const garmentImages = useBlobImages("garment", getTrialGarmentImage);
+const personImages = useBlobImages("person", getTrialPersonImage);
+const trialImages = useBlobImages("trial", getCreationTrialImage);
 
 const max = computed(() => props.version.maxGarments);
 const needPerson = computed(() => props.version.personRequired);
@@ -55,11 +55,38 @@ const roles = computed(() => {
     seen.set(roleLabel(g.role), roleLabel(g.role));
   return [...seen.keys()];
 });
-const shown = computed(() =>
+const pageSize = 24;
+const count = ref(pageSize);
+const filtered = computed(() =>
   role.value
     ? garments.value.filter(g => roleLabel(g.role) === role.value)
     : garments.value
 );
+const shown = computed(() => filtered.value.slice(0, count.value));
+watch(role, () => (count.value = pageSize));
+// 衣物缩略图只在进入视口时才取。
+const observer =
+  typeof IntersectionObserver === "undefined"
+    ? undefined
+    : new IntersectionObserver(
+        entries =>
+          entries.forEach(e => {
+            if (!e.isIntersecting) return;
+            observer?.unobserve(e.target);
+            (e.target as HTMLElement & { _load?: () => void })._load?.();
+          }),
+        { rootMargin: "120px" }
+      );
+const vInView = {
+  mounted(el: HTMLElement & { _load?: () => void }, b: { value: () => void }) {
+    el._load = b.value;
+    if (observer) observer.observe(el);
+    else b.value();
+  },
+  unmounted(el: HTMLElement) {
+    observer?.unobserve(el);
+  }
+};
 const active = computed(() =>
   trials.value.some(t => t.status === "QUEUED" || t.status === "RUNNING")
 );
@@ -114,11 +141,13 @@ watch(
   list => list.forEach(t => t.status === "SUCCEEDED" && trialImages.load(t.id)),
   { immediate: true }
 );
-watch(shown, list => list.forEach(g => garmentImages.load(g.id)));
 watch(persons, list => list.forEach(p => personImages.load(p.id)), {
   immediate: true
 });
-onBeforeUnmount(() => timer && clearInterval(timer));
+onBeforeUnmount(() => {
+  if (timer) clearInterval(timer);
+  observer?.disconnect();
+});
 onMounted(async () => {
   void loadTrials();
   try {
@@ -255,6 +284,7 @@ const statusText = (t: Trial) =>
           <div
             v-for="g in shown"
             :key="g.id"
+            v-in-view="() => garmentImages.load(g.id)"
             class="garment"
             :class="{
               on: picked.includes(g.id),
@@ -276,6 +306,12 @@ const statusText = (t: Trial) =>
             <span class="hint">{{ roleLabel(g.role) }}</span>
           </div>
         </div>
+        <el-button
+          v-if="filtered.length > shown.length"
+          class="more"
+          @click="count += pageSize"
+          >显示更多（还有 {{ filtered.length - shown.length }} 件）</el-button
+        >
       </template>
 
       <template v-if="needPerson">
@@ -494,6 +530,9 @@ h3 {
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.more {
+  margin-top: 8px;
 }
 .persons {
   display: flex;

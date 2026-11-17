@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import {
   getCreationPreviewImage,
   getCreationTemplates,
@@ -8,7 +8,12 @@ import {
 import { useCurrentPermissions } from "@/composables/useCurrentPermissions";
 import { message } from "@/utils/message";
 import EffectEditor from "./EffectEditor.vue";
-import { effectState, errorText, useBlobImages } from "./effectShared";
+import {
+  clearImageCache,
+  effectState,
+  errorText,
+  useBlobImages
+} from "./effectShared";
 
 defineOptions({ name: "ClosetCreationTemplates" });
 const { can } = useCurrentPermissions();
@@ -21,7 +26,7 @@ const key = (t: TemplateSummary) => {
   const id = (v.published ?? v.draft)?.versionId;
   return id ? `${t.id}|${id}` : "";
 };
-const previews = useBlobImages(k => {
+const previews = useBlobImages("preview", k => {
   const [t, v] = k.split("|");
   return getCreationPreviewImage(t, v);
 });
@@ -33,10 +38,7 @@ async function refresh() {
     templates.value = (await getCreationTemplates()).data.items;
     templates.value.forEach(t => {
       const k = key(t);
-      if (k) {
-        previews.drop(k);
-        previews.load(k);
-      }
+      if (k) previews.load(k);
     });
   } catch (e) {
     message(errorText(e), { type: "error" });
@@ -49,6 +51,7 @@ function back() {
   void refresh();
 }
 onMounted(refresh);
+onBeforeUnmount(clearImageCache);
 </script>
 
 <template>
