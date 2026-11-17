@@ -544,7 +544,7 @@ onMounted(async () => {
 }
 .preview img,
 .preview .ph {
-  width: 96px;
+  width: 120px;
   aspect-ratio: 4 / 3;
   object-fit: cover;
   background: var(--el-fill-color-light);

@@ -495,7 +495,7 @@ h3 {
 }
 .garments {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 8px;
 }
 .garment,
@@ -575,7 +575,7 @@ h3 {
 }
 .records {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
 }
 .record {
@@ -588,6 +588,7 @@ h3 {
   align-items: center;
   justify-content: center;
   aspect-ratio: 3 / 4;
+  max-height: 260px;
   padding: 8px;
   font-size: 13px;
   color: var(--el-text-color-secondary);
