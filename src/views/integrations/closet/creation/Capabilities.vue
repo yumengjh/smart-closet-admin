@@ -188,7 +188,7 @@ onMounted(() => {
 </script>
 <template>
   <section class="creation-page">
-    <h1>模型能力</h1>
+    <h1>模型高级设置</h1>
     <p class="caption">人工记录穿搭创作能力与验证结论；此操作不会调用模型。</p>
     <p class="caption">
       在收费管理的成本费率中使用成本标识配置对应模型的费率。

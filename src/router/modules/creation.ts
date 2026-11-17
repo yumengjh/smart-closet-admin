@@ -3,16 +3,17 @@ export default {
   path: "/creation",
   name: "ClosetCreation",
   component: Layout,
-  redirect: "/creation/guide",
+  redirect: "/creation/templates",
   meta: { title: "穿搭创作", icon: "ri/image-line", rank: 39 },
   children: [
     {
-      path: "/creation/guide",
-      name: "ClosetCreationGuide",
-      component: () => import("@/views/integrations/closet/creation/Guide.vue"),
+      path: "/creation/templates",
+      name: "ClosetCreationTemplates",
+      component: () =>
+        import("@/views/integrations/closet/creation/Templates.vue"),
       meta: {
-        title: "使用指南",
-        icon: "ri/book-open-line",
+        title: "创作效果",
+        icon: "ri/image-line",
         auths: ["closet:creation:read"]
       }
     },
@@ -28,13 +29,12 @@ export default {
       }
     },
     {
-      path: "/creation/templates",
-      name: "ClosetCreationTemplates",
-      component: () =>
-        import("@/views/integrations/closet/creation/Templates.vue"),
+      path: "/creation/usage",
+      name: "ClosetCreationUsage",
+      component: () => import("@/views/integrations/closet/creation/Usage.vue"),
       meta: {
-        title: "模板",
-        icon: "ri/image-line",
+        title: "用量",
+        icon: "ri/bar-chart-line",
         auths: ["closet:creation:read"]
       }
     },
@@ -44,18 +44,9 @@ export default {
       component: () =>
         import("@/views/integrations/closet/creation/Capabilities.vue"),
       meta: {
-        title: "模型能力",
+        title: "模型高级设置",
         icon: "ri/settings-3-line",
-        auths: ["closet:creation:read"]
-      }
-    },
-    {
-      path: "/creation/usage",
-      name: "ClosetCreationUsage",
-      component: () => import("@/views/integrations/closet/creation/Usage.vue"),
-      meta: {
-        title: "用量",
-        icon: "ri/bar-chart-line",
+        showLink: false,
         auths: ["closet:creation:read"]
       }
     }

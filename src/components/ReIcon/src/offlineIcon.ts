@@ -10,7 +10,6 @@ import RiSettings3Line from "~icons/ri/settings-3-line?raw";
 import RiImageLine from "~icons/ri/image-line?raw";
 import RiGalleryLine from "~icons/ri/gallery-line?raw";
 import RiBarChartLine from "~icons/ri/bar-chart-line?raw";
-import RiBookOpenLine from "~icons/ri/book-open-line?raw";
 import RiUserSettingsLine from "~icons/ri/user-settings-line?raw";
 import RiShieldKeyholeLine from "~icons/ri/shield-keyhole-line?raw";
 import RiMenuLine from "~icons/ri/menu-line?raw";
@@ -45,7 +44,6 @@ const icons = [
   ["ri/image-line", RiImageLine],
   ["ri/gallery-line", RiGalleryLine],
   ["ri/bar-chart-line", RiBarChartLine],
-  ["ri/book-open-line", RiBookOpenLine],
   ["ri/user-settings-line", RiUserSettingsLine],
   ["ri/shield-keyhole-line", RiShieldKeyholeLine],
   ["ri/menu-line", RiMenuLine],

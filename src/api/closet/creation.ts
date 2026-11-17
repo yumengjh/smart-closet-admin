@@ -52,6 +52,7 @@ export type TemplateSummary = {
 export type VersionDetail = VersionSummary & {
   id: string;
   previewAssetId: string;
+  previewImage: boolean;
   options: { light: string[] };
   prompt: string;
   provider: string | null;
@@ -162,5 +163,104 @@ export const getCreationGenerationOptions = () =>
   );
 export const saveCreationCapability = (data: CapabilityEdit) =>
   http.request<ApiResponse<Capability>>("put", `${root}/capabilities`, {
+    data
+  });
+
+export type TrialGarment = {
+  id: string;
+  name: string;
+  role: string;
+  gender: string;
+};
+export type TrialPerson = {
+  id: string;
+  note: string;
+  width: number;
+  height: number;
+  createdAtMs: number;
+};
+export type TrialLight = "DEFAULT" | "WARM" | "COOL";
+export type TrialStart = {
+  revision: number;
+  garmentIds: string[];
+  personId?: string | null;
+  light?: TrialLight;
+  pose?: string | null;
+};
+export type Trial = {
+  id: string;
+  templateId: string;
+  versionId: string;
+  versionRevision: number;
+  status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+  provider: string;
+  model: string;
+  garmentCount: number;
+  withPerson: boolean;
+  light: string;
+  pose: string | null;
+  errorMessage: string | null;
+  width: number | null;
+  height: number | null;
+  current: boolean;
+  createdAtMs: number;
+  finishedAtMs: number | null;
+};
+export type UseTrial = { revision?: number; trialId: string };
+const trialImage = (path: string) =>
+  http.request<Blob>("get", `${root}/${path}/image`, { responseType: "blob" });
+const uuid = encodeURIComponent;
+export const getTrialGarments = () =>
+  http.request<ApiResponse<{ items: TrialGarment[] }>>(
+    "get",
+    `${root}/trial-garments`
+  );
+export const getTrialGarmentImage = (id: string) =>
+  trialImage(`trial-garments/${uuid(id)}`);
+export const getTrialPersons = () =>
+  http.request<ApiResponse<{ items: TrialPerson[] }>>(
+    "get",
+    `${root}/trial-persons`
+  );
+export const uploadTrialPerson = (file: File, sourceNote: string) => {
+  const data = new FormData();
+  data.append("file", file);
+  data.append("sourceNote", sourceNote);
+  return http.request<ApiResponse<TrialPerson>>(
+    "post",
+    `${root}/trial-persons`,
+    { data, headers: { "Content-Type": undefined }, timeout: 60000 }
+  );
+};
+export const getTrialPersonImage = (id: string) =>
+  trialImage(`trial-persons/${uuid(id)}`);
+export const deleteTrialPerson = (id: string) =>
+  http.request<ApiResponse<{ deleted: boolean }>>(
+    "delete",
+    `${root}/trial-persons/${uuid(id)}`
+  );
+export const startCreationTrial = (id: string, v: string, data: TrialStart) =>
+  http.request<ApiResponse<Trial>>("post", `${version(id, v)}/trials`, {
+    data
+  });
+export const getCreationTrials = (id: string) =>
+  http.request<ApiResponse<{ items: Trial[] }>>(
+    "get",
+    `${template(id)}/trials`
+  );
+export const getCreationTrial = (trialId: string) =>
+  http.request<ApiResponse<Trial>>("get", `${root}/trials/${uuid(trialId)}`);
+export const getCreationTrialImage = (trialId: string) =>
+  trialImage(`trials/${uuid(trialId)}`);
+export const setCreationPreview = (id: string, v: string, data: UseTrial) =>
+  http.request<ApiResponse<VersionDetail>>(
+    "post",
+    `${version(id, v)}/preview`,
+    {
+      data
+    }
+  );
+export const launchCreationVersion = (id: string, v: string, data: UseTrial) =>
+  http.request<ApiResponse<VersionDetail>>("post", `${version(id, v)}/launch`, {
     data
   });

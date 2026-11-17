@@ -89,6 +89,45 @@ const cases = [
     ["2026-11-01", "2026-11-02"],
     "get",
     "/closet/creations/usage"
+  ],
+  ["getTrialGarments", [], "get", "/closet/creations/trial-garments"],
+  [
+    "getTrialGarmentImage",
+    ["g/1"],
+    "get",
+    "/closet/creations/trial-garments/g%2F1/image"
+  ],
+  ["getTrialPersons", [], "get", "/closet/creations/trial-persons"],
+  [
+    "getTrialPersonImage",
+    ["p1"],
+    "get",
+    "/closet/creations/trial-persons/p1/image"
+  ],
+  ["deleteTrialPerson", ["p1"], "delete", "/closet/creations/trial-persons/p1"],
+  [
+    "startCreationTrial",
+    [id, version, { revision: 3, garmentIds: ["g1"] }],
+    "post",
+    `${base}/versions/${version}/trials`,
+    { revision: 3, garmentIds: ["g1"] }
+  ],
+  ["getCreationTrials", [id], "get", `${base}/trials`],
+  ["getCreationTrial", ["t1"], "get", "/closet/creations/trials/t1"],
+  ["getCreationTrialImage", ["t1"], "get", "/closet/creations/trials/t1/image"],
+  [
+    "setCreationPreview",
+    [id, version, { trialId: "t1" }],
+    "post",
+    `${base}/versions/${version}/preview`,
+    { trialId: "t1" }
+  ],
+  [
+    "launchCreationVersion",
+    [id, version, { revision: 5, trialId: "t1" }],
+    "post",
+    `${base}/versions/${version}/launch`,
+    { revision: 5, trialId: "t1" }
   ]
 ];
 for (const [name, args, method, path, data] of cases) {
@@ -99,17 +138,19 @@ for (const [name, args, method, path, data] of cases) {
   assert.equal(calls[0][1], path, name);
   if (data)
     assert.equal(JSON.stringify(calls[0][2].data), JSON.stringify(data), name);
+  if (name === "getCreationUsage")
+    assert.equal(
+      JSON.stringify(calls[0][2].params),
+      JSON.stringify({ from: "2026-11-01", to: "2026-11-02" })
+    );
+  if (name.endsWith("Image"))
+    assert.equal(calls[0][2].responseType, "blob", name);
 }
-assert.equal(
-  JSON.stringify(calls[0][2].params),
-  JSON.stringify({ from: "2026-11-01", to: "2026-11-02" })
-);
 await exports.getCreationVersion("sunlit-flatlay", "v/a");
 assert.ok(calls.at(-1)[1].endsWith("v%2Fa"), "version IDs must be encoded");
 
 for (const key of [
   "closet-creation-templates",
-  "closet-creation-guide",
   "closet-creation-capabilities",
   "closet-creation-usage"
 ]) {
@@ -133,12 +174,12 @@ const [creationRoutes, dynamicRoutes, offlineIcons] = await Promise.all([
   readProjectFile("../src/components/ReIcon/src/offlineIcon.ts")
 ]);
 assert.ok(
-  creationRoutes.includes('redirect: "/creation/guide"'),
-  "the creation module must open the guide by default"
+  creationRoutes.includes('redirect: "/creation/templates"'),
+  "the creation module must open the effects page by default"
 );
+assert.ok(!creationRoutes.includes("Guide.vue"), "guide page is removed");
 
 const creationPages = [
-  ["guide", "closet-creation-guide", "ri/book-open-line", "Guide.vue"],
   ["templates", "closet-creation-templates", "ri/image-line", "Templates.vue"],
   [
     "capabilities",
@@ -175,5 +216,5 @@ for (const [route, key, icon, view] of creationPages) {
   );
 }
 console.log(
-  "Creation API: 11 operations, static/dynamic navigation, and offline icons verified."
+  "Creation API: 23 operations, static/dynamic navigation, and offline icons verified."
 );
