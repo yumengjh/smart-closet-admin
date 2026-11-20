@@ -37,6 +37,8 @@ export type NavigationRoute = {
     | "closet-creation-templates"
     | "closet-creation-capabilities"
     | "closet-creation-usage"
+    | "closet-presets"
+    | "closet-onboarding"
     | "closet-creation-showcases"
     | null;
   title: string;
