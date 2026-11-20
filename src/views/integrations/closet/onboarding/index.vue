@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { ElMessageBox, type UploadFile } from "element-plus";
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
+import { ElMessageBox } from "element-plus";
 import {
   getStyleCoverImage,
   getStyleCovers,
@@ -13,6 +13,7 @@ import { message } from "@/utils/message";
 import ClosetUnavailable from "../ClosetUnavailable.vue";
 import PresetImage from "../PresetImage.vue";
 import { useClosetRequest } from "../useClosetRequest";
+import CoverCrop from "./CoverCrop.vue";
 
 defineOptions({ name: "ClosetOnboarding" });
 const { can } = useCurrentPermissions();
@@ -20,39 +21,55 @@ const { loading, unavailable, errorMessage, run } = useClosetRequest();
 const canWrite = computed(() => can("closet:onboarding:write"));
 const items = ref<StyleCover[]>([]);
 const selected = ref<StyleCover>();
-const file = ref<File>();
-const preview = ref("");
+const fileInput = ref<HTMLInputElement>();
+const crop = ref<InstanceType<typeof CoverCrop>>();
+const image = shallowRef<HTMLImageElement>();
 const dialog = ref(false);
 const busy = ref(false);
+const decoding = ref(false);
+let active = true;
 
 function refresh() {
   return run(getStyleCovers, ({ data }) => {
     items.value = data.items;
   });
 }
-function clearPreview() {
-  if (preview.value) URL.revokeObjectURL(preview.value);
-  preview.value = "";
-  file.value = undefined;
-}
 function begin(row: StyleCover) {
-  clearPreview();
   selected.value = row;
-  dialog.value = true;
+  fileInput.value?.click();
 }
-function choose(upload: UploadFile) {
-  clearPreview();
-  if (!upload.raw) return;
-  if (!["image/png", "image/jpeg", "image/webp"].includes(upload.raw.type)) {
+async function choose(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
     message("请选择 PNG、JPEG 或 WebP 图片", { type: "warning" });
     return;
   }
-  if (!upload.raw.size || upload.raw.size > 8 * 1024 * 1024) {
+  if (!file.size || file.size > 8 * 1024 * 1024) {
     message("图片不能为空，且不能超过 8 MB", { type: "warning" });
     return;
   }
-  file.value = upload.raw;
-  preview.value = URL.createObjectURL(upload.raw);
+  decoding.value = true;
+  const url = URL.createObjectURL(file);
+  try {
+    const source = new Image();
+    source.src = url;
+    await source.decode();
+    if (active) {
+      image.value = source;
+      dialog.value = true;
+    }
+  } catch {
+    if (active) message("无法读取这张图片，请重新选择", { type: "error" });
+  } finally {
+    URL.revokeObjectURL(url);
+    decoding.value = false;
+  }
+}
+function clearImage() {
+  if (!dialog.value) image.value = undefined;
 }
 function errorMessageFor(error: unknown) {
   const response = (error as { response?: { data?: { message?: string } } })
@@ -60,10 +77,11 @@ function errorMessageFor(error: unknown) {
   return response?.data?.message || "操作失败，请重试";
 }
 async function save() {
-  if (!selected.value || !file.value) return;
+  if (!selected.value || !crop.value) return;
   busy.value = true;
   try {
-    await putStyleCover(selected.value.key, file.value);
+    const file = await crop.value.exportJpeg();
+    await putStyleCover(selected.value.key, file);
     dialog.value = false;
     message("已保存封面", { type: "success" });
     await refresh();
@@ -95,7 +113,9 @@ async function remove(row: StyleCover) {
   }
 }
 onMounted(refresh);
-onBeforeUnmount(clearPreview);
+onBeforeUnmount(() => {
+  active = false;
+});
 </script>
 
 <template>
@@ -123,7 +143,7 @@ onBeforeUnmount(clearPreview);
               <el-button
                 text
                 type="primary"
-                :disabled="busy"
+                :disabled="busy || decoding"
                 @click="begin(row)"
                 >{{ row.configured ? "更换" : "上传" }}</el-button
               >
@@ -131,7 +151,7 @@ onBeforeUnmount(clearPreview);
                 v-if="row.configured"
                 text
                 type="danger"
-                :disabled="busy"
+                :disabled="busy || decoding"
                 @click="remove(row)"
                 >移除</el-button
               >
@@ -141,34 +161,37 @@ onBeforeUnmount(clearPreview);
       </div>
     </template>
 
+    <input
+      ref="fileInput"
+      type="file"
+      accept="image/png,image/jpeg,image/webp"
+      hidden
+      @change="choose"
+    />
     <el-dialog
       v-model="dialog"
-      :title="`${selected?.style ?? ''}封面`"
-      width="min(92%, 520px)"
+      :title="`裁剪${selected?.style ?? ''}封面`"
+      width="min(94%, 720px)"
       :close-on-click-modal="!busy"
       :close-on-press-escape="!busy"
       :show-close="!busy"
-      @closed="clearPreview"
+      @closed="clearImage"
     >
-      <div v-if="preview" class="cover-preview">
-        <img :src="preview" alt="待上传的封面" />
-      </div>
-      <p>建议比例 4:3。PNG、JPEG 或 WebP，最多 8 MB。</p>
-      <el-upload
-        accept="image/png,image/jpeg,image/webp"
-        :auto-upload="false"
-        :show-file-list="false"
-        :on-change="choose"
-      >
-        <el-button :disabled="busy">{{
-          preview ? "重新选择" : "选择图片"
-        }}</el-button>
-      </el-upload>
+      <CoverCrop
+        v-if="image && selected"
+        ref="crop"
+        :source="image"
+        :style-name="selected.style"
+        :disabled="busy"
+      />
       <template #footer>
+        <el-button :disabled="busy || decoding" @click="fileInput?.click()"
+          >重新选择</el-button
+        >
         <el-button :disabled="busy" @click="dialog = false">取消</el-button>
         <el-button
           type="primary"
-          :disabled="!file"
+          :disabled="!image || decoding"
           :loading="busy"
           @click="save"
           >上传封面</el-button
@@ -199,20 +222,13 @@ onBeforeUnmount(clearPreview);
   border-radius: var(--el-border-radius-base);
 }
 
-.cover-empty,
-.cover-preview {
+.cover-empty {
   display: grid;
   place-items: center;
   aspect-ratio: 4 / 3;
   overflow: hidden;
   color: var(--el-text-color-secondary);
   background: var(--el-fill-color-light);
-}
-
-.cover-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .card-footer {

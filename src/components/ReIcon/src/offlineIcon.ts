@@ -8,6 +8,7 @@ import EpHomeFilled from "~icons/ep/home-filled?raw";
 // https://icon-sets.iconify.design/ri/?keyword=ri
 import RiSettings3Line from "~icons/ri/settings-3-line?raw";
 import RiImageLine from "~icons/ri/image-line?raw";
+import RiImageAddLine from "~icons/ri/image-add-line?raw";
 import RiGalleryLine from "~icons/ri/gallery-line?raw";
 import RiBarChartLine from "~icons/ri/bar-chart-line?raw";
 import RiUserSettingsLine from "~icons/ri/user-settings-line?raw";
@@ -23,6 +24,7 @@ import RiNotification3Line from "~icons/ri/notification-3-line?raw";
 import RiUser3Line from "~icons/ri/user-3-line?raw";
 import RiLockPasswordLine from "~icons/ri/lock-password-line?raw";
 import RiTShirtLine from "~icons/ri/t-shirt-line?raw";
+import RiTShirt2Line from "~icons/ri/t-shirt-2-line?raw";
 import RiBarChartBoxLine from "~icons/ri/bar-chart-box-line?raw";
 import RiPulseLine from "~icons/ri/pulse-line?raw";
 import RiComputerLine from "~icons/ri/computer-line?raw";
@@ -42,6 +44,7 @@ const icons = [
   // Remix Icon: https://github.com/Remix-Design/RemixIcon
   ["ri/settings-3-line", RiSettings3Line],
   ["ri/image-line", RiImageLine],
+  ["ri/image-add-line", RiImageAddLine],
   ["ri/gallery-line", RiGalleryLine],
   ["ri/bar-chart-line", RiBarChartLine],
   ["ri/user-settings-line", RiUserSettingsLine],
@@ -57,6 +60,7 @@ const icons = [
   ["ri/user-3-line", RiUser3Line],
   ["ri/lock-password-line", RiLockPasswordLine],
   ["ri/t-shirt-line", RiTShirtLine],
+  ["ri/t-shirt-2-line", RiTShirt2Line],
   ["ri/bar-chart-box-line", RiBarChartBoxLine],
   ["ri/pulse-line", RiPulseLine],
   ["ri/computer-line", RiComputerLine],
