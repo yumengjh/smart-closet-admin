@@ -48,12 +48,17 @@ const filtered = computed(
     Boolean(registeredVia.value) ||
     typeof deactivated.value === "boolean"
 );
+/** 粘贴的是 16 位十六进制的用户编号（Umami 里的 Distinct ID）时按编号精确查询，否则按用户名或昵称搜索。 */
+const USER_KEY = /^[0-9a-f]{16}$/i;
 const load = async () => {
   if (!can("closet:user:read")) return;
+  const text = query.value.trim();
+  const byKey = USER_KEY.test(text);
   return run(
     () =>
       listClosetUsers({
-        q: query.value.trim() || undefined,
+        q: byKey ? undefined : text || undefined,
+        userKey: byKey ? text.toLowerCase() : undefined,
         status: status.value || undefined,
         role: role.value || undefined,
         registeredVia: registeredVia.value || undefined,
@@ -162,7 +167,7 @@ onMounted(load);
             v-model="query"
             class="toolbar-search"
             clearable
-            placeholder="搜索用户名或昵称"
+            placeholder="搜索用户名、昵称或用户编号"
             @keyup.enter="search"
             @clear="search"
           />
@@ -241,6 +246,21 @@ onMounted(load);
                   </div>
                 </div>
               </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="用户编号" min-width="150">
+            <template #default="{ row }">
+              <el-tooltip
+                v-if="row.userKey"
+                content="点击复制。与 Umami 里的 Distinct ID 相同"
+                ><span
+                  v-copy:click="row.userKey"
+                  class="user-key"
+                  @click.stop
+                  >{{ row.userKey }}</span
+                ></el-tooltip
+              >
+              <span v-else>—</span>
             </template>
           </el-table-column>
           <el-table-column label="状态" min-width="150">
@@ -371,6 +391,12 @@ onMounted(load);
 </template>
 
 <style scoped>
+.user-key {
+  font-family: var(--el-font-family-mono, ui-monospace, monospace);
+  font-size: 12px;
+  cursor: copy;
+}
+
 .toolbar {
   display: grid;
   grid-template-columns:

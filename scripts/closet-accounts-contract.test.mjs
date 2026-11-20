@@ -101,6 +101,16 @@ list.registeredVia.value = "OPEN";
 await list.load();
 assert.equal(calls.at(-1)[2].params.page, 0);
 assert.equal(calls.at(-1)[2].params.deactivated, false);
+// A pasted 16-hex user number (Umami Distinct ID) queries userKey exactly instead of q.
+list.query.value = " AAAABBBBCCCCDDDD ";
+await list.load();
+assert.equal(calls.at(-1)[2].params.userKey, "aaaabbbbccccdddd");
+assert.equal(calls.at(-1)[2].params.q, undefined);
+list.query.value = "alice";
+await list.load();
+assert.equal(calls.at(-1)[2].params.q, "alice");
+assert.equal(calls.at(-1)[2].params.userKey, undefined);
+list.query.value = "";
 list.onSortChange({ prop: "lastLoginAtMs", order: "ascending" });
 assert.equal(calls.at(-1)[2].params.sort, "lastLoginAt");
 assert.equal(calls.at(-1)[2].params.order, "asc");

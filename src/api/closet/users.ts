@@ -22,6 +22,8 @@ export type ClosetUserSummary = {
   lastLoginAtMs: number | null;
   deactivatedAtMs: number | null;
   username: string;
+  /** 用户编号：与鱼搭管理接口、Umami 的 Distinct ID 相同（HMAC 前 16 位），用于从统计数据定位账号。 */
+  userKey?: string;
   role: ClosetRole;
   enabled: boolean;
   mustChangePassword: boolean;
@@ -50,6 +52,8 @@ export type ClosetPage<T> = {
 };
 export type ClosetUserQuery = {
   q?: string;
+  /** 精确匹配用户编号（16 位小写十六进制）。 */
+  userKey?: string;
   status?: ClosetUserStatus;
   role?: ClosetRole;
   registeredVia?: RegisteredVia;

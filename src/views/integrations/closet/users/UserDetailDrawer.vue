@@ -453,6 +453,16 @@ const clearTemporaryPassword = () => {
         <el-tabs v-model="tab">
           <el-tab-pane label="概览" name="overview">
             <el-descriptions :column="2" border size="small" class="mb-4">
+              <el-descriptions-item label="用户编号">
+                <el-tooltip
+                  v-if="detail.userKey"
+                  content="点击复制。与 Umami 里的 Distinct ID 相同"
+                  ><span v-copy:click="detail.userKey" class="user-key">{{
+                    detail.userKey
+                  }}</span></el-tooltip
+                >
+                <span v-else>—</span>
+              </el-descriptions-item>
               <el-descriptions-item label="注册来源">{{
                 registeredViaNames[detail.registeredVia] ?? detail.registeredVia
               }}</el-descriptions-item>
@@ -824,6 +834,12 @@ const clearTemporaryPassword = () => {
 </template>
 
 <style scoped>
+.user-key {
+  font-family: var(--el-font-family-mono, ui-monospace, monospace);
+  font-size: 12px;
+  cursor: copy;
+}
+
 .drawer-body {
   min-height: 240px;
 }
