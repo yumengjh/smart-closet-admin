@@ -366,6 +366,8 @@ onMounted(async () => {
             <el-option label="衣柜洞察" value="closet-insights" />
             <el-option label="业务大屏" value="closet-dashboard" />
             <el-option label="实时试穿" value="closet-tryon" />
+            <el-option label="试穿内容 · 精选整套" value="closet-looks" />
+            <el-option label="试穿内容 · 动作管理" value="closet-poses" />
             <el-option
               label="穿搭创作 · 创作效果"
               value="closet-creation-templates" />
