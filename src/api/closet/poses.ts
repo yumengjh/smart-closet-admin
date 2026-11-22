@@ -96,3 +96,42 @@ export const putPoseCheckSettings = (
     `${root}/check-settings`,
     { data }
   );
+
+// ── 敏感词表（鱼搭设计 5.3）：存在鱼搭数据库，增、改、停用、删除都立即生效 ──
+export type PoseTermSource = "SEED" | "ADMIN";
+export type PoseSensitiveTerm = {
+  id: string;
+  term: string;
+  kind: PoseHitKind;
+  reason: string;
+  enabled: boolean;
+  source: PoseTermSource;
+  createdAtMs: number;
+  updatedAtMs: number;
+};
+export type PoseTermCreate = {
+  term: string;
+  kind: PoseHitKind;
+  reason: string;
+};
+export type PoseTermEdit = Partial<PoseTermCreate> & { enabled?: boolean };
+
+const terms = `${root}/sensitive-terms`;
+const term = (id: string) => `${terms}/${encodeURIComponent(id)}`;
+
+export const getPoseTerms = (params: {
+  kind?: PoseHitKind;
+  enabled?: boolean;
+  q?: string;
+}) =>
+  http.request<ApiResponse<{ items: PoseSensitiveTerm[]; total: number }>>(
+    "get",
+    terms,
+    { params }
+  );
+export const createPoseTerm = (data: PoseTermCreate) =>
+  http.request<ApiResponse<PoseSensitiveTerm>>("post", terms, { data });
+export const editPoseTerm = (id: string, data: PoseTermEdit) =>
+  http.request<ApiResponse<PoseSensitiveTerm>>("patch", term(id), { data });
+export const removePoseTerm = (id: string) =>
+  http.request<void>("delete", term(id));

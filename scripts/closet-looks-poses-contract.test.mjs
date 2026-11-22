@@ -121,13 +121,40 @@ for (const [name, args, method, path, data] of [
   ["extractPose", [file], "post", "/extract"],
   ["checkPose", [pose], "post", "/check", pose],
   ["getPoseCheckSettings", [], "get", "/check-settings"],
-  ["putPoseCheckSettings", [settings], "put", "/check-settings", settings]
+  ["putPoseCheckSettings", [settings], "put", "/check-settings", settings],
+  [
+    "getPoseTerms",
+    [{ kind: "MINOR", enabled: false, q: "萝" }],
+    "get",
+    "/sensitive-terms"
+  ],
+  [
+    "createPoseTerm",
+    [{ term: "摸臀", kind: "SUGGESTIVE", reason: "带性暗示" }],
+    "post",
+    "/sensitive-terms",
+    { term: "摸臀", kind: "SUGGESTIVE", reason: "带性暗示" }
+  ],
+  [
+    "editPoseTerm",
+    ["a/b", { enabled: false }],
+    "patch",
+    "/sensitive-terms/a%2Fb",
+    { enabled: false }
+  ],
+  ["removePoseTerm", ["a/b"], "delete", "/sensitive-terms/a%2Fb"]
 ]) {
   await poses[name](...args);
   const [actualMethod, actualPath, options] = calls.at(-1);
   assert.equal(actualMethod, method, name);
   assert.equal(actualPath, `/closet/poses${path}`, name);
   if (data) assert.deepEqual(plain(options.data), data, name);
+  if (name === "getPoseTerms")
+    assert.deepEqual(plain(options.params), {
+      kind: "MINOR",
+      enabled: false,
+      q: "萝"
+    });
   if (name === "extractPose") {
     assert.equal(options.data, file, "extraction sends raw bytes");
     assert.equal(options.headers["Content-Type"], "image/png");
@@ -235,6 +262,29 @@ assert.deepEqual(
   "gateway violations become hits"
 );
 assert.deepEqual(plain(logic.violationHits(undefined)), []);
+
+// ── Sensitive word form: same limits as the closet server (word 1–20, reason 1–60, one line) ──
+const word = { term: " 摸臀 ", kind: "SUGGESTIVE", reason: "带性暗示" };
+assert.equal(logic.termProblem(word), "");
+assert.equal(
+  logic.termProblem({
+    ...word,
+    term: "长".repeat(20),
+    reason: "理".repeat(60)
+  }),
+  ""
+);
+for (const bad of [
+  { ...word, term: "  " },
+  { ...word, term: "长".repeat(21) },
+  { ...word, term: "摸\n臀" },
+  { ...word, kind: "" },
+  { ...word, kind: "OTHER" },
+  { ...word, reason: "" },
+  { ...word, reason: "理".repeat(61) },
+  { ...word, reason: "带\n性暗示" }
+])
+  assert.notEqual(logic.termProblem(bad), "", JSON.stringify(bad));
 const poseSource = await read("src/views/integrations/closet/poses/index.vue");
 assert.ok(
   poseSource.includes('"CLOSET_POSE_REJECTED"'),
@@ -317,6 +367,19 @@ assert.ok(
   posesPage.includes("ElMessageBox.confirm"),
   "check settings are confirmed before saving"
 );
+assert.ok(posesPage.includes('<el-tab-pane label="敏感词"'));
+const termsPage = await read(
+  "src/views/integrations/closet/poses/SensitiveTerms.vue"
+);
+assert.ok(
+  termsPage.includes("ElMessageBox.confirm") &&
+    termsPage.includes("后立即生效"),
+  "deleting a word is confirmed and says it takes effect at once"
+);
+assert.ok(
+  termsPage.includes('v-if="props.canWrite"'),
+  "write actions need closet:poses:write"
+);
 console.log(
-  "Closet looks and poses: API paths, settings diff, skeleton mapping and routes covered."
+  "Closet looks and poses: API paths, settings diff, skeleton mapping, sensitive words and routes covered."
 );

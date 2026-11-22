@@ -25,6 +25,7 @@ import { message } from "@/utils/message";
 import ClosetUnavailable from "../ClosetUnavailable.vue";
 import { formatTime, useClosetRequest } from "../useClosetRequest";
 import PoseSkeleton from "./PoseSkeleton.vue";
+import SensitiveTerms from "./SensitiveTerms.vue";
 import {
   CHECK_KINDS,
   HIT_KINDS,
@@ -68,6 +69,7 @@ const canWrite = computed(() => can("closet:poses:write"));
 const listRequest = useClosetRequest();
 const settingsRequest = useClosetRequest();
 let active = true;
+const tab = ref<"poses" | "terms">("poses");
 
 // ── 敏感检查 ──
 const settings = ref<PoseCheckSettings>();
@@ -441,120 +443,132 @@ onBeforeUnmount(() => {
         </div>
       </el-card>
 
-      <el-form inline class="filters" @submit.prevent="refresh">
-        <el-form-item label="状态">
-          <el-select
-            v-model="filterStatus"
-            clearable
-            placeholder="全部状态"
-            @change="refresh"
-          >
-            <el-option
-              v-for="(label, value) in statuses"
+      <el-tabs v-model="tab">
+        <el-tab-pane label="动作" name="poses">
+          <el-form inline class="filters" @submit.prevent="refresh">
+            <el-form-item label="状态">
+              <el-select
+                v-model="filterStatus"
+                clearable
+                placeholder="全部状态"
+                @change="refresh"
+              >
+                <el-option
+                  v-for="(label, value) in statuses"
+                  :key="value"
+                  :label="label"
+                  :value="value"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="搜索">
+              <el-input
+                v-model="query"
+                clearable
+                placeholder="名称或描述"
+                @clear="refresh"
+              />
+            </el-form-item>
+            <el-button native-type="submit">搜索</el-button>
+          </el-form>
+          <div v-if="canWrite" class="actions">
+            <el-button type="primary" @click="openCreate">新建动作</el-button>
+            <el-button :loading="extracting" @click="pickPhoto"
+              >从照片提取</el-button
+            >
+            <span class="muted">已选 {{ selection.length }} 个</span>
+            <el-button
+              v-for="(label, value) in actions"
               :key="value"
-              :label="label"
-              :value="value"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="搜索">
-          <el-input
-            v-model="query"
-            clearable
-            placeholder="名称或描述"
-            @clear="refresh"
+              :disabled="busy || !selection.length"
+              @click="change(value)"
+              >{{ label }}</el-button
+            >
+          </div>
+          <el-alert
+            v-if="listRequest.errorMessage.value"
+            :title="listRequest.errorMessage.value"
+            type="error"
+            :closable="false"
           />
-        </el-form-item>
-        <el-button native-type="submit">搜索</el-button>
-      </el-form>
-      <div v-if="canWrite" class="actions">
-        <el-button type="primary" @click="openCreate">新建动作</el-button>
-        <el-button :loading="extracting" @click="pickPhoto"
-          >从照片提取</el-button
-        >
-        <span class="muted">已选 {{ selection.length }} 个</span>
-        <el-button
-          v-for="(label, value) in actions"
-          :key="value"
-          :disabled="busy || !selection.length"
-          @click="change(value)"
-          >{{ label }}</el-button
-        >
-      </div>
-      <el-alert
-        v-if="listRequest.errorMessage.value"
-        :title="listRequest.errorMessage.value"
-        type="error"
-        :closable="false"
-      />
-      <el-table
-        v-loading="listRequest.loading.value"
-        :data="rows"
-        row-key="id"
-        border
-        empty-text="暂无符合条件的动作"
-        @selection-change="(value: ManagedPose[]) => (selection = value)"
-      >
-        <el-table-column v-if="canWrite" type="selection" width="44" />
-        <el-table-column label="名称" min-width="130">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="openEdit(row)">{{
-              row.name
-            }}</el-button>
-            <div class="muted mono">{{ row.id }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="description"
-          label="描述"
-          min-width="260"
-          show-overflow-tooltip
-        />
-        <el-table-column label="标签" min-width="140">
-          <template #default="{ row }">
-            <el-tag
-              v-for="tag in row.tags"
-              :key="tag"
-              size="small"
-              class="tag"
-              >{{ tag }}</el-tag
-            >
-          </template>
-        </el-table-column>
-        <el-table-column label="视角" width="110">
-          <template #default="{ row }">{{
-            row.viewAngle ? angles[row.viewAngle as ViewAngle] : "—"
-          }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="90">
-          <template #default="{ row }">
-            <el-tag
-              size="small"
-              :type="statusTypes[row.status as PoseStatus]"
-              >{{ statuses[row.status as PoseStatus] }}</el-tag
-            >
-          </template>
-        </el-table-column>
-        <el-table-column prop="sort" label="排序" width="70" align="center" />
-        <el-table-column label="来源" width="70">
-          <template #default="{ row }">{{
-            sources[row.source as keyof typeof sources] ?? row.source
-          }}</template>
-        </el-table-column>
-        <el-table-column label="关节点" width="80" align="center">
-          <template #default="{ row }">{{
-            row.keypoints && Object.keys(row.keypoints).length ? "有" : "—"
-          }}</template>
-        </el-table-column>
-        <el-table-column label="更新时间" width="170">
-          <template #default="{ row }">{{
-            formatTime(row.updatedAtMs)
-          }}</template>
-        </el-table-column>
-      </el-table>
-      <p v-if="total > rows.length" class="muted">
-        共 {{ total }} 个，只显示前 {{ rows.length }} 个，请用筛选缩小范围
-      </p>
+          <el-table
+            v-loading="listRequest.loading.value"
+            :data="rows"
+            row-key="id"
+            border
+            empty-text="暂无符合条件的动作"
+            @selection-change="(value: ManagedPose[]) => (selection = value)"
+          >
+            <el-table-column v-if="canWrite" type="selection" width="44" />
+            <el-table-column label="名称" min-width="130">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="openEdit(row)">{{
+                  row.name
+                }}</el-button>
+                <div class="muted mono">{{ row.id }}</div>
+              </template>
+            </el-table-column>
+            <el-table-column
+              prop="description"
+              label="描述"
+              min-width="260"
+              show-overflow-tooltip
+            />
+            <el-table-column label="标签" min-width="140">
+              <template #default="{ row }">
+                <el-tag
+                  v-for="tag in row.tags"
+                  :key="tag"
+                  size="small"
+                  class="tag"
+                  >{{ tag }}</el-tag
+                >
+              </template>
+            </el-table-column>
+            <el-table-column label="视角" width="110">
+              <template #default="{ row }">{{
+                row.viewAngle ? angles[row.viewAngle as ViewAngle] : "—"
+              }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="90">
+              <template #default="{ row }">
+                <el-tag
+                  size="small"
+                  :type="statusTypes[row.status as PoseStatus]"
+                  >{{ statuses[row.status as PoseStatus] }}</el-tag
+                >
+              </template>
+            </el-table-column>
+            <el-table-column
+              prop="sort"
+              label="排序"
+              width="70"
+              align="center"
+            />
+            <el-table-column label="来源" width="70">
+              <template #default="{ row }">{{
+                sources[row.source as keyof typeof sources] ?? row.source
+              }}</template>
+            </el-table-column>
+            <el-table-column label="关节点" width="80" align="center">
+              <template #default="{ row }">{{
+                row.keypoints && Object.keys(row.keypoints).length ? "有" : "—"
+              }}</template>
+            </el-table-column>
+            <el-table-column label="更新时间" width="170">
+              <template #default="{ row }">{{
+                formatTime(row.updatedAtMs)
+              }}</template>
+            </el-table-column>
+          </el-table>
+          <p v-if="total > rows.length" class="muted">
+            共 {{ total }} 个，只显示前 {{ rows.length }} 个，请用筛选缩小范围
+          </p>
+        </el-tab-pane>
+        <el-tab-pane label="敏感词" name="terms" lazy>
+          <SensitiveTerms :can-write="canWrite" />
+        </el-tab-pane>
+      </el-tabs>
     </template>
 
     <input

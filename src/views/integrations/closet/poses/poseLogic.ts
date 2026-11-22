@@ -168,3 +168,26 @@ export function violationHits(violations: unknown): PoseHit[] {
     ];
   });
 }
+
+/** Same limits as the closet server: word 1–20 characters, reason 1–60, both on one line. */
+export const TERM_MAX = 20;
+export const REASON_MAX = 60;
+const length = (value: string) => [...value].length;
+
+/** The first problem of a sensitive-word form, or "" when it can be saved. */
+export function termProblem(form: {
+  term: string;
+  kind: string;
+  reason: string;
+}) {
+  const term = form.term.trim();
+  const reason = form.reason.trim();
+  if (!term) return "请填写词";
+  if (length(term) > TERM_MAX) return `词最多 ${TERM_MAX} 个字`;
+  if (/[\r\n]/.test(term)) return "词不能换行";
+  if (!(form.kind in HIT_KINDS)) return "请选择类型";
+  if (!reason) return "请填写理由";
+  if (length(reason) > REASON_MAX) return `理由最多 ${REASON_MAX} 个字`;
+  if (/[\r\n]/.test(reason)) return "理由不能换行";
+  return "";
+}
