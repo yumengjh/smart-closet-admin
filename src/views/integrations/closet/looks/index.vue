@@ -753,8 +753,12 @@ onBeforeUnmount(() => {
 
 .look-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
+
+  /* el-checkbox-group 自带 font-size: 0; line-height: 0，卡片里的文字会继承成看不见、挤成一团，这里恢复正常排版。 */
+  font-size: var(--el-font-size-base);
+  line-height: 1.5;
 }
 
 .look-card {
@@ -787,12 +791,25 @@ onBeforeUnmount(() => {
 .card-meta {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 10px 12px 12px;
 }
 
 .card-meta strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
   overflow-wrap: anywhere;
+}
+
+.card-meta .muted {
+  font-size: 12px;
+}
+
+.card-meta .el-checkbox {
+  height: 24px;
+  margin-right: 0;
 }
 
 .tags {

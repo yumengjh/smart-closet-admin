@@ -157,6 +157,10 @@ onMounted(() => void refresh());
   gap: 10px;
   max-height: 46vh;
   overflow: auto;
+
+  /* el-checkbox-group 自带 font-size: 0; line-height: 0，恢复正常排版。 */
+  font-size: var(--el-font-size-base);
+  line-height: 1.5;
 }
 
 .card {
