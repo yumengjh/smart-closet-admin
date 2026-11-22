@@ -1,6 +1,7 @@
 import type {
   PoseCheckSide,
   PoseCheckValues,
+  PoseHit,
   PoseHitKind,
   PoseKeypoints
 } from "@/api/closet/poses";
@@ -145,4 +146,25 @@ export function cleanTags(tags: string[], max = 8) {
     if (value) seen.add(value);
   }
   return [...seen].slice(0, max);
+}
+
+/** Turn the gateway's rejection violations ({field: kind, message: "词：理由"}) back into hits. */
+export function violationHits(violations: unknown): PoseHit[] {
+  if (!Array.isArray(violations)) return [];
+  return violations.flatMap(item => {
+    const { field, message } = (item ?? {}) as {
+      field?: unknown;
+      message?: unknown;
+    };
+    if (typeof field !== "string" || !(field in HIT_KINDS)) return [];
+    const text = typeof message === "string" ? message : "";
+    const split = text.search(/[：:]/);
+    return [
+      {
+        kind: field as PoseHitKind,
+        term: split < 0 ? text : text.slice(0, split).trim(),
+        reason: split < 0 ? "" : text.slice(split + 1).trim()
+      }
+    ];
+  });
 }

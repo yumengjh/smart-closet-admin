@@ -31,7 +31,8 @@ import {
   POSE_ID,
   SIDES,
   checkChanges,
-  cleanTags
+  cleanTags,
+  violationHits
 } from "./poseLogic";
 
 defineOptions({ name: "ClosetPoses" });
@@ -60,7 +61,7 @@ const actions: Record<PoseAction, string> = {
 };
 const removeText =
   "移除后用户在做张图里不能再选这个动作，已经生成的上身图不受影响。";
-const maxPhotoBytes = 8 * 1024 * 1024;
+const maxPhotoBytes = 20 * 1024 * 1024;
 
 const { can } = useCurrentPermissions();
 const canWrite = computed(() => can("closet:poses:write"));
@@ -266,20 +267,22 @@ async function save() {
     description: value.description.trim(),
     tags: cleanTags(value.tags),
     viewAngle: value.viewAngle,
-    status: value.status,
-    sort: value.sort
+    status: value.status
   };
   busy.value = true;
   try {
     if (editing.value) {
       // Keypoints are a read-only preview here; editing never rewrites them.
-      await editPose(editing.value.id, body);
+      await editPose(editing.value.id, { ...body, sort: value.sort });
     } else {
-      await createPose({
+      const { data } = await createPose({
         ...body,
         ...(value.id ? { id: value.id } : {}),
         ...(value.keypoints ? { keypoints: value.keypoints } : {})
       });
+      // Creation does not take a sort; only PATCH does.
+      if (value.sort !== data.sort)
+        await editPose(data.id, { sort: value.sort });
     }
     if (!active) return;
     drawer.value = false;
@@ -294,9 +297,7 @@ async function save() {
       });
     } else {
       showError(error);
-      // The proxy may drop the hits; a 4xx on save is most often the sensitive check.
-      const code = status(error);
-      if (code === 400 || code === 422) await runCheck();
+      if (status(error) === 422) await runCheck();
     }
   } finally {
     busy.value = false;
@@ -315,7 +316,7 @@ async function choosePhoto(event: Event) {
     return;
   }
   if (!file.size || file.size > maxPhotoBytes) {
-    message("图片不能为空，且不能超过 8 MB", { type: "warning" });
+    message("图片不能为空，且不能超过 20 MB", { type: "warning" });
     return;
   }
   extracting.value = true;
@@ -346,10 +347,13 @@ async function choosePhoto(event: Event) {
 function status(error: unknown) {
   return (error as { response?: { status?: number } })?.response?.status;
 }
+/** 422 CLOSET_POSE_REJECTED carries the hits as violations {field: kind, message: "词：理由"}. */
 function responseHits(error: unknown) {
-  const data = (error as { response?: { data?: { hits?: unknown } } })?.response
-    ?.data;
-  return Array.isArray(data?.hits) ? (data.hits as PoseHit[]) : undefined;
+  const data = (
+    error as { response?: { data?: { code?: string; violations?: unknown } } }
+  )?.response?.data;
+  if (data?.code !== "CLOSET_POSE_REJECTED") return undefined;
+  return violationHits(data.violations);
 }
 function showError(error: unknown) {
   const response = (error as { response?: { data?: { message?: string } } })
@@ -592,6 +596,8 @@ onBeforeUnmount(() => {
             placeholder="写清身体朝向、重心、手臂和腿的位置，以及构图"
           />
         </el-form-item>
+      </el-form>
+      <div class="check-block">
         <div class="check-line">
           <el-button
             :loading="checking"
@@ -619,6 +625,12 @@ onBeforeUnmount(() => {
             class="hit"
           />
         </template>
+      </div>
+      <el-form
+        label-position="top"
+        :disabled="!canWrite"
+        @submit.prevent="save"
+      >
         <el-form-item label="标签">
           <el-select
             v-model="form.tags"
@@ -745,6 +757,10 @@ onBeforeUnmount(() => {
 
 .tag {
   margin: 2px 4px 2px 0;
+}
+
+.check-block {
+  margin-bottom: 18px;
 }
 
 .check-line {
