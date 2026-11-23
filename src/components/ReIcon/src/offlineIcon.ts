@@ -36,6 +36,7 @@ import RiCoupon3Line from "~icons/ri/coupon-3-line?raw";
 import RiShieldCheckLine from "~icons/ri/shield-check-line?raw";
 import RiPriceTag3Line from "~icons/ri/price-tag-3-line?raw";
 import RiVidiconLine from "~icons/ri/vidicon-line?raw";
+import RiFeedbackLine from "~icons/ri/feedback-line?raw";
 
 // 后端菜单的 icon 字段使用这里注册的 key（如 ri/pulse-line），新增菜单图标需在此补充
 const icons = [
@@ -71,7 +72,8 @@ const icons = [
   ["ri/coupon-3-line", RiCoupon3Line],
   ["ri/shield-check-line", RiShieldCheckLine],
   ["ri/price-tag-3-line", RiPriceTag3Line],
-  ["ri/vidicon-line", RiVidiconLine]
+  ["ri/vidicon-line", RiVidiconLine],
+  ["ri/feedback-line", RiFeedbackLine]
 ];
 
 icons.forEach(([name, icon]) => {

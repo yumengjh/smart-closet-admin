@@ -53,6 +53,8 @@ const definitions = {
     "closet:templates:write": ["审核鱼搭模板", "调整审核状态、启用与加分。"],
     "closet:styleterms:read": ["查看鱼搭待审风格词", "读取助手学到、等待审核的风格词。"],
     "closet:styleterms:write": ["审核鱼搭风格词", "批准或驳回风格词，批准后对全站生效。"],
+    "closet:feedback:read": ["查看鱼搭用户反馈", "读取用户提交的问题与建议、状态和回复。"],
+    "closet:feedback:write": ["处理鱼搭用户反馈", "改状态、回复、写内部备注、删除，开关未登录反馈。"],
     "resume:manage": ["管理公开简历", "允许查看和编辑公开简历的全部内容。"]
   },
   navigationComponent: {
@@ -76,7 +78,8 @@ const definitions = {
     "closet-ops": ["运行监控", "鱼搭只读运维。"],
     "closet-exports": ["数据导出", "按天汇总与去标识事件。"],
     "closet-templates": ["模板审核", "搭配模板人工审核。"],
-    "closet-style-terms": ["风格词审核", "助手学到的风格词人工审核。"]
+    "closet-style-terms": ["风格词审核", "助手学到的风格词人工审核。"],
+    "closet-feedback": ["用户反馈", "鱼搭用户的问题与建议，查看、处理与回复。"]
   },
   ipRuleType: {
     ALLOW: ["允许访问", "命中该规则的 IP 或网段允许访问 API。"],
