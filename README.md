@@ -27,7 +27,7 @@ pnpm build
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
 | [smart-closet-admin-server](https://github.com/yumengjh/smart-closet-admin-server)                                                                                                               | 管理平台后端（本平台的接口）                                      |
 | [smart-closet](https://github.com/yumengjh/smart-closet)                                                                                                                                         | 鱼搭用户端                                                        |
-| [smart-closet-server-review](https://github.com/yumengjh/smart-closet-server-review)                                                                                                             | 鱼搭后端评审裁剪副本，管理接口契约见其 `docs/management-api.yaml` |
+| [smart-closet-server-review](https://github.com/yumengjh/smart-closet-server-review)                                                                                                             | 鱼搭后端评审裁剪副本，管理接口契约见其 `docs/reference/management-api.yaml` |
 | [smart-closet-mp](https://github.com/yumengjh/smart-closet-mp) · [yuda-website](https://github.com/yumengjh/yuda-website) · [smart-closet-promo](https://github.com/yumengjh/smart-closet-promo) | 小程序、官网、演示视频                                            |
 
 ## 致谢
