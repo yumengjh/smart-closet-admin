@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { ElMessageBox } from "element-plus";
 import {
   extractSample,
@@ -51,6 +52,8 @@ const IMAGE_TYPES = ["image/png", "image/jpeg"];
 const { can } = useCurrentPermissions();
 const canWrite = computed(() => can("closet:samples:write"));
 const request = useClosetRequest();
+const router = useRouter();
+const goTemplates = () => void router.push("/closet/templates");
 let active = true;
 
 const status = ref<string>();
@@ -306,54 +309,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="space-y-4">
-    <el-card shadow="never">
-      <div class="flex flex-wrap items-center gap-3">
-        <h2 class="mr-auto text-lg font-semibold">整套样本</h2>
-        <el-select
-          v-model="status"
-          clearable
-          placeholder="全部状态"
-          class="!w-40"
-          aria-label="状态筛选"
-          @change="refresh"
-        >
-          <el-option
-            v-for="(label, value) in statusNames"
-            :key="value"
-            :label="label"
-            :value="value"
-          />
-        </el-select>
-        <el-button :loading="request.loading.value" @click="refresh"
-          >刷新</el-button
-        >
-        <el-button v-if="canWrite" type="primary" @click="openUpload"
-          >上传样本</el-button
-        >
-      </div>
-      <p class="mt-2 text-sm">
-        上传无人物、你有权使用的整套穿搭图，提取后人工审核。审核完成后原图立即删除，只保留去标识的提取结果。
-      </p>
-      <div v-if="stats" class="mt-3 flex flex-wrap gap-2">
-        <el-tag type="success">已通过 {{ stats.approved }}</el-tag>
-        <el-tag
-          v-for="item in statusCounts"
-          :key="item.key"
-          :type="statusTypes[item.key] ?? 'info'"
-          effect="plain"
-          >{{ item.label }} {{ item.count }}</el-tag
-        >
-        <el-tag
-          v-for="(count, name) in stats.presentation"
-          :key="name"
-          type="info"
-          effect="plain"
-          >{{ name || "未标注" }} {{ count }}</el-tag
-        >
-      </div>
-    </el-card>
-
+  <div class="page-root space-y-4">
     <ClosetUnavailable
       v-if="request.unavailable.value"
       :loading="request.loading.value"
@@ -364,60 +320,151 @@ onBeforeUnmount(() => {
       :title="request.errorMessage.value"
       type="error"
       :closable="false"
-    />
-    <el-card v-else v-loading="request.loading.value" shadow="never">
-      <el-table :data="samples" row-key="id" empty-text="还没有样本">
-        <el-table-column label="状态" width="110">
-          <template #default="{ row }"
-            ><el-tag :type="statusTypes[row.status] ?? 'info'">{{
-              statusNames[row.status] ?? row.status
-            }}</el-tag></template
+      ><el-button link @click="refresh">重试</el-button></el-alert
+    >
+    <template v-else>
+      <el-card shadow="never">
+        <template #header>
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="mr-auto">
+              <h2 class="text-base font-semibold">整套样本</h2>
+              <p class="text-xs text-[var(--el-text-color-secondary)]">
+                收集一人一套的真实穿搭照片，模型提取穿搭结构（品类、颜色、配件、风格、姿势），管理员核对后通过或拒绝。通过的样本用于统计，也可以一键生成搭配模板草稿，草稿要在“模板审核”里通过后才参与推荐。原图在审核完成后立即删除，只保留去标识的提取结果与来源链接；多人、拼图、明显未成年、非照片会被自动拒收。
+              </p>
+            </div>
+            <el-select
+              v-model="status"
+              clearable
+              placeholder="全部状态"
+              class="!w-40"
+              aria-label="状态筛选"
+              @change="refresh"
+            >
+              <el-option
+                v-for="(label, value) in statusNames"
+                :key="value"
+                :label="label"
+                :value="value"
+              />
+            </el-select>
+            <el-button :loading="request.loading.value" @click="refresh"
+              >刷新</el-button
+            >
+            <el-button v-if="canWrite" type="primary" @click="openUpload"
+              >上传样本</el-button
+            >
+          </div>
+        </template>
+        <el-steps simple :active="-1" class="flow-steps">
+          <el-step title="上传" />
+          <el-step title="模型提取" />
+          <el-step title="人工审核" />
+          <el-step title="统计 / 生成模板草稿" />
+          <el-step title="模板审核" />
+        </el-steps>
+        <p class="mt-3 text-xs text-[var(--el-text-color-secondary)]">
+          草稿生成后到
+          <el-button link type="primary" @click="goTemplates"
+            >模板审核</el-button
           >
-        </el-table-column>
-        <el-table-column label="授权" min-width="130">
-          <template #default="{ row }">{{
-            licenseNames[row.license as SampleLicense] ?? row.license
-          }}</template>
-        </el-table-column>
-        <el-table-column label="形象" width="100">
-          <template #default="{ row }">{{ row.presentation || "—" }}</template>
-        </el-table-column>
-        <el-table-column
-          prop="note"
-          label="备注"
-          min-width="180"
-          show-overflow-tooltip
-        />
-        <el-table-column label="原图" width="80">
-          <template #default="{ row }">{{
-            row.hasImage ? "保留中" : "已删除"
-          }}</template>
-        </el-table-column>
-        <el-table-column label="模板" width="90">
-          <template #default="{ row }">{{
-            row.templateId ? "已生成" : "—"
-          }}</template>
-        </el-table-column>
-        <el-table-column label="更新时间" min-width="170">
-          <template #default="{ row }">{{
-            formatTime(row.updatedAtMs)
-          }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="90" fixed="right">
-          <template #default="{ row }"
-            ><el-button link type="primary" @click="openDetail(row)"
-              >详情</el-button
-            ></template
-          >
-        </el-table-column>
-      </el-table>
-      <p
-        v-if="samples.length >= 200"
-        class="mt-3 text-xs text-[var(--el-text-color-secondary)]"
-      >
-        只显示最近 200 条，可用状态筛选缩小范围。
-      </p>
-    </el-card>
+          处理，通过且启用后才参与推荐。
+        </p>
+      </el-card>
+
+      <el-card v-if="stats" shadow="never">
+        <template #header>
+          <span class="text-base font-semibold">已通过样本统计</span>
+        </template>
+        <div class="space-y-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="w-20 text-sm text-[var(--el-text-color-secondary)]"
+              >状态计数</span
+            >
+            <el-tag type="success">已通过 {{ stats.approved }}</el-tag>
+            <el-tag
+              v-for="item in statusCounts"
+              :key="item.key"
+              :type="statusTypes[item.key] ?? 'info'"
+              effect="plain"
+              >{{ item.label }} {{ item.count }}</el-tag
+            >
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="w-20 text-sm text-[var(--el-text-color-secondary)]"
+              >按形象分组</span
+            >
+            <el-tag
+              v-for="(count, name) in stats.presentation"
+              :key="name"
+              type="info"
+              effect="plain"
+              >{{ name || "未标注" }} {{ count }}</el-tag
+            >
+            <span
+              v-if="!Object.keys(stats.presentation ?? {}).length"
+              class="text-sm text-[var(--el-text-color-secondary)]"
+              >暂无已通过样本</span
+            >
+          </div>
+        </div>
+      </el-card>
+
+      <el-card v-loading="request.loading.value" shadow="never">
+        <el-table :data="samples" row-key="id" empty-text="还没有样本">
+          <el-table-column label="状态" width="110">
+            <template #default="{ row }"
+              ><el-tag :type="statusTypes[row.status] ?? 'info'">{{
+                statusNames[row.status] ?? row.status
+              }}</el-tag></template
+            >
+          </el-table-column>
+          <el-table-column label="授权" min-width="130">
+            <template #default="{ row }">{{
+              licenseNames[row.license as SampleLicense] ?? row.license
+            }}</template>
+          </el-table-column>
+          <el-table-column label="形象" width="100">
+            <template #default="{ row }">{{
+              row.presentation || "—"
+            }}</template>
+          </el-table-column>
+          <el-table-column
+            prop="note"
+            label="备注"
+            min-width="180"
+            show-overflow-tooltip
+          />
+          <el-table-column label="原图" width="80">
+            <template #default="{ row }">{{
+              row.hasImage ? "保留中" : "已删除"
+            }}</template>
+          </el-table-column>
+          <el-table-column label="模板" width="90">
+            <template #default="{ row }">{{
+              row.templateId ? "已生成" : "—"
+            }}</template>
+          </el-table-column>
+          <el-table-column label="更新时间" min-width="170">
+            <template #default="{ row }">{{
+              formatTime(row.updatedAtMs)
+            }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="90" fixed="right">
+            <template #default="{ row }"
+              ><el-button link type="primary" @click="openDetail(row)"
+                >详情</el-button
+              ></template
+            >
+          </el-table-column>
+        </el-table>
+        <p
+          v-if="samples.length >= 200"
+          class="mt-3 text-xs text-[var(--el-text-color-secondary)]"
+        >
+          只显示最近 200 条，可用状态筛选缩小范围。
+        </p>
+      </el-card>
+    </template>
 
     <input
       ref="fileInput"
@@ -436,14 +483,23 @@ onBeforeUnmount(() => {
       destroy-on-close
     >
       <el-alert
-        title="请使用无人物、你有权使用的整套图"
-        type="warning"
+        title="采集要求"
+        type="info"
         :closable="false"
         show-icon
         class="mb-3"
       >
-        PNG 或 JPEG，最大 10
-        MB。上传后会立即调用识图模型提取一次，疑似未成年的图片会被自动拒收，重复图片会提示已收过。
+        <ul class="list-disc pl-4 text-xs leading-5">
+          <li>一张图一个人一套衣服，尽量全身，光线正常。</li>
+          <li>不收秀场、cosplay、演出服、制服。</li>
+          <li>
+            必须选择许可；“不确定”只参与统计，不能生成模板草稿。来源链接尽量填写。
+          </li>
+          <li>
+            PNG 或 JPEG，最大 10
+            MB。上传后立即调用识图模型提取一次，疑似未成年的图片会被自动拒收，重复图片会提示已收过。
+          </li>
+        </ul>
       </el-alert>
       <div class="upload-box">
         <img v-if="uploadPreview" :src="uploadPreview" alt="待上传的样本" />
@@ -461,7 +517,7 @@ onBeforeUnmount(() => {
           />
         </el-form-item>
         <el-form-item label="授权">
-          <el-select v-model="uploadForm.license">
+          <el-select v-model="uploadForm.license" class="w-full">
             <el-option
               v-for="(label, value) in licenseNames"
               :key="value"
@@ -560,30 +616,50 @@ onBeforeUnmount(() => {
           class="mt-2"
         />
         <div v-if="canWrite" class="mt-3 flex flex-wrap gap-2">
-          <el-button
+          <el-tooltip
             v-if="['PENDING', 'FAILED', 'EXTRACTED'].includes(selected.status)"
-            :disabled="busy || !selected.hasImage"
-            @click="extract"
-            >{{ selected.extraction ? "重新提取" : "提取" }}</el-button
+            content="会调用识图模型；重新提取会覆盖当前提取结果"
           >
+            <span
+              ><el-button
+                :disabled="busy || !selected.hasImage"
+                @click="extract"
+                >{{ selected.extraction ? "重新提取" : "提取" }}</el-button
+              ></span
+            >
+          </el-tooltip>
           <template v-if="canEdit">
-            <el-button :disabled="busy" @click="saveResult">保存修改</el-button>
-            <el-button
-              type="success"
-              :disabled="busy"
-              @click="review('APPROVED')"
-              >审核通过</el-button
+            <el-tooltip content="保存上面编辑过的提取结果，不改变状态">
+              <el-button :disabled="busy" @click="saveResult"
+                >保存修改</el-button
+              >
+            </el-tooltip>
+            <el-tooltip
+              content="通过后参与统计，原图立即删除，提取结果不能再改"
             >
-            <el-button
-              type="warning"
-              :disabled="busy"
-              @click="review('REJECTED')"
-              >审核拒绝</el-button
-            >
+              <el-button
+                type="success"
+                :disabled="busy"
+                @click="review('APPROVED')"
+                >审核通过</el-button
+              >
+            </el-tooltip>
+            <el-tooltip content="拒绝后原图立即删除，样本不参与统计">
+              <el-button
+                type="warning"
+                :disabled="busy"
+                @click="review('REJECTED')"
+                >审核拒绝</el-button
+              >
+            </el-tooltip>
           </template>
-          <el-button type="danger" plain :disabled="busy" @click="remove"
-            >删除</el-button
+          <el-tooltip
+            content="删除不可恢复：样本、提取结果和原图都不再保留，已生成的模板草稿不受影响"
           >
+            <el-button type="danger" plain :disabled="busy" @click="remove"
+              >删除</el-button
+            >
+          </el-tooltip>
         </div>
 
         <template v-if="selected.status === 'APPROVED'">
@@ -591,10 +667,7 @@ onBeforeUnmount(() => {
           <p v-if="selected.templateId" class="text-sm">
             已生成草稿（{{ selected.templateId }}），请到“模板审核”处理。
           </p>
-          <p v-else-if="selected.license === 'UNKNOWN'" class="text-sm">
-            授权不确定的样本只参与统计，不能生成模板。
-          </p>
-          <el-form v-else-if="canDraft" label-position="top">
+          <el-form v-else-if="canWrite" label-position="top">
             <el-form-item label="类型">
               <el-select v-model="draftKind">
                 <el-option label="经典" value="CLASSIC" />
@@ -609,9 +682,20 @@ onBeforeUnmount(() => {
                 placeholder="只写具体单品，不写风格形容词"
               />
             </el-form-item>
-            <el-button type="primary" :loading="busy" @click="createDraft"
-              >生成模板草稿</el-button
+            <el-tooltip
+              :disabled="selected.license !== 'UNKNOWN'"
+              content="授权不确定的样本只参与统计，不能生成模板草稿"
             >
+              <span
+                ><el-button
+                  type="primary"
+                  :loading="busy"
+                  :disabled="!canDraft"
+                  @click="createDraft"
+                  >生成模板草稿</el-button
+                ></span
+              >
+            </el-tooltip>
           </el-form>
           <el-input
             v-if="draftResult"
@@ -625,10 +709,14 @@ onBeforeUnmount(() => {
         </template>
       </template>
     </el-drawer>
-  </main>
+  </div>
 </template>
 
 <style scoped>
+.flow-steps {
+  padding: 10px 16px;
+}
+
 .upload-box {
   display: grid;
   gap: 12px;

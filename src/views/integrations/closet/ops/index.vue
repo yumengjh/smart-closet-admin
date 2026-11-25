@@ -299,7 +299,14 @@ onMounted(() => void load());
           >
         </el-card>
         <el-card shadow="never"
-          ><template #header>数据库</template>
+          ><template #header
+            ><div class="flex flex-wrap items-center justify-between gap-2">
+              <span>数据库</span
+              ><span class="text-sm text-[var(--el-text-color-secondary)]"
+                >类型与迁移版本</span
+              >
+            </div></template
+          >
           <el-descriptions
             v-if="health.database"
             :column="width < 768 ? 1 : 2"
@@ -418,6 +425,9 @@ onMounted(() => void load());
         >
       </template>
       <template v-if="tab === 'mail' && mail">
+        <p class="text-xs text-[var(--el-text-color-secondary)]">
+          鱼搭邮件模块的发信情况：验证码、找回密码、安全提醒与告警。只显示用途和结果的计数，不含收件地址和内容。邮件关闭时这里只有历史记录。
+        </p>
         <el-card shadow="never"
           ><template #header
             ><div class="flex flex-wrap justify-between gap-2">
@@ -476,6 +486,9 @@ onMounted(() => void load());
         </el-card>
       </template>
       <template v-if="tab === 'monitor' && monitor">
+        <p class="text-xs text-[var(--el-text-color-secondary)]">
+          鱼搭服务内的每分钟自检（内存、堆、磁盘、数据库、助手、模型调用、任务积压、错误日志）。触发后按设置发告警邮件，这里只读，规则改动需改部署配置。
+        </p>
         <el-card shadow="never"
           ><template #header
             ><div class="flex flex-wrap justify-between gap-2">
@@ -492,16 +505,32 @@ onMounted(() => void load());
               >
             </div></template
           >
-          <el-table :data="monitor.rules" empty-text="监控未开启，没有规则状态"
+          <el-table
+            :data="monitor.rules"
+            empty-text="监控未开启，没有规则状态"
+            :row-class-name="({ row }) => (row.firing ? 'firing-row' : '')"
             ><el-table-column label="规则" min-width="110"
               ><template #default="{ row }">{{
                 monitorRuleNames[row.rule] ?? row.rule
               }}</template></el-table-column
             ><el-table-column label="状态" width="100"
               ><template #default="{ row }"
-                ><el-tag :type="row.firing ? 'danger' : 'success'">{{
-                  row.firing ? "告警中" : "正常"
-                }}</el-tag></template
+                ><el-tag
+                  :type="
+                    row.firing
+                      ? 'danger'
+                      : row.lastCheckedMs == null
+                        ? 'info'
+                        : 'success'
+                  "
+                  >{{
+                    row.firing
+                      ? "告警中"
+                      : row.lastCheckedMs == null
+                        ? "未检查"
+                        : "正常"
+                  }}</el-tag
+                ></template
               ></el-table-column
             ><el-table-column label="告警起始" min-width="170"
               ><template #default="{ row }">{{
@@ -613,3 +642,9 @@ onMounted(() => void load());
     </div>
   </div>
 </template>
+
+<style scoped>
+:deep(.firing-row) {
+  --el-table-tr-bg-color: var(--el-color-danger-light-9);
+}
+</style>
