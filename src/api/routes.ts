@@ -27,6 +27,7 @@ export type NavigationRoute = {
     | "closet-ops"
     | "closet-exports"
     | "closet-templates"
+    | "closet-samples"
     | "closet-style-terms"
     | "closet-feedback"
     | "closet-tryon"

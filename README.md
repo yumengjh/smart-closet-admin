@@ -3,7 +3,7 @@
 鱼搭（数字衣柜）的独立管理后台前端，Vue 3 + Element Plus。通过 `smart-closet-admin-server` 以中立管理接口接入鱼搭业务服务，不改动鱼搭本体。
 
 - 首页：业务大屏，展示用户、衣柜、搭配与推荐的实时概览，随平台主题切换浅色/深色。
-- 鱼搭业务：衣柜洞察、业务用户、运行监控、数据导出、模板审核。
+- 鱼搭业务：衣柜洞察、业务用户、运行监控（含数据库、邮件用量、监控规则）、数据导出、模板审核、整套样本。
 - 系统管理：用户、角色与权限、菜单、运行配置、IP 规则、审计日志、数据清理、SQL 执行台，以及平台自身的运行概览。
 
 ## 开发
@@ -23,12 +23,12 @@ pnpm build
 
 ## 相关仓库
 
-| 仓库                                                                                                                                                                                             | 内容                                                              |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| [smart-closet-admin-server](https://github.com/yumengjh/smart-closet-admin-server)                                                                                                               | 管理平台后端（本平台的接口）                                      |
-| [smart-closet](https://github.com/yumengjh/smart-closet)                                                                                                                                         | 鱼搭用户端                                                        |
+| 仓库                                                                                                                                                                                             | 内容                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| [smart-closet-admin-server](https://github.com/yumengjh/smart-closet-admin-server)                                                                                                               | 管理平台后端（本平台的接口）                                                |
+| [smart-closet](https://github.com/yumengjh/smart-closet)                                                                                                                                         | 鱼搭用户端                                                                  |
 | [smart-closet-server-review](https://github.com/yumengjh/smart-closet-server-review)                                                                                                             | 鱼搭后端评审裁剪副本，管理接口契约见其 `docs/reference/management-api.yaml` |
-| [smart-closet-mp](https://github.com/yumengjh/smart-closet-mp) · [yuda-website](https://github.com/yumengjh/yuda-website) · [smart-closet-promo](https://github.com/yumengjh/smart-closet-promo) | 小程序、官网、演示视频                                            |
+| [smart-closet-mp](https://github.com/yumengjh/smart-closet-mp) · [yuda-website](https://github.com/yumengjh/yuda-website) · [smart-closet-promo](https://github.com/yumengjh/smart-closet-promo) | 小程序、官网、演示视频                                                      |
 
 ## 致谢
 

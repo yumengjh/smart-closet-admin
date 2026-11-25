@@ -92,7 +92,38 @@ export type OpsStatus = {
   };
   providers: Record<string, unknown>;
   sessions: { active: number; onlineLast5Min: number };
+  database?: { vendor: "H2" | "POSTGRESQL"; schemaVersion: string | null };
   generatedAtMs: number;
+};
+export type MailUsage = {
+  enabled: boolean;
+  available: boolean;
+  dailyLimit: number;
+  ordinaryLimit: number;
+  usedToday: number;
+  logRetentionDays: number;
+  days: number;
+  byDay: Array<{
+    date: string;
+    purpose: string;
+    status: string;
+    count: number;
+  }>;
+  errors: Array<{ errorKind: string; count: number }>;
+};
+export type MonitorRule = {
+  rule: string;
+  firing: boolean;
+  sinceMs: number | null;
+  lastCheckedMs: number | null;
+  reading: string | null;
+  threshold: string | null;
+};
+export type MonitorStatus = {
+  enabled: boolean;
+  alertConfigured: boolean;
+  intervalSeconds: number;
+  rules: MonitorRule[];
 };
 export type Series = Array<{ metric: TrendMetric; values: number[] }>;
 export type DashboardSnapshot = {
@@ -271,6 +302,12 @@ const repeatParams = {
 };
 export const getClosetOps = () =>
   http.request<ApiResponse<OpsStatus>>("get", `${root}/ops/status`);
+export const getClosetMailUsage = (days = 7) =>
+  http.request<ApiResponse<MailUsage>>("get", `${root}/ops/mail`, {
+    params: { days }
+  });
+export const getClosetMonitor = () =>
+  http.request<ApiResponse<MonitorStatus>>("get", `${root}/ops/monitor`);
 export const getClosetAssistantTokenBudget = () =>
   http.request<ApiResponse<SiteTokenBudget>>(
     "get",

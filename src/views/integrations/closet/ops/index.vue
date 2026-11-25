@@ -5,8 +5,12 @@ import { onMounted, ref, watch } from "vue";
 import {
   getClosetOps,
   getClosetAssistantTokenBudget,
+  getClosetMailUsage,
+  getClosetMonitor,
   getClosetTasks,
   getClosetOperationLog,
+  type MailUsage,
+  type MonitorStatus,
   type OpsStatus,
   type SiteTokenBudget,
   type Page,
@@ -26,6 +30,45 @@ const { loading, unavailable, errorMessage, run } = useClosetRequest();
 const tab = ref("status");
 const health = ref<OpsStatus>();
 const tokenBudget = ref<SiteTokenBudget>();
+const mail = ref<MailUsage>();
+const monitor = ref<MonitorStatus>();
+const mailDays = ref(7);
+const mailPurposeNames: Record<string, string> = {
+  REGISTER_CODE: "注册验证码",
+  REGISTER_EXISTS: "注册（邮箱已注册提示）",
+  BIND_CODE: "绑定邮箱验证码",
+  RESET_CODE: "找回密码验证码",
+  SECURITY_NOTICE: "安全提醒",
+  ALERT: "监控告警",
+  TEST: "测试邮件"
+};
+const mailStatusNames: Record<string, string> = {
+  PENDING: "发送中",
+  SENT: "已发送",
+  FAILED: "失败",
+  DROPPED_LIMIT: "超额丢弃"
+};
+const mailErrorNames: Record<string, string> = {
+  AUTH: "认证失败",
+  CONNECT: "连接失败",
+  TIMEOUT: "超时",
+  REJECTED: "被拒收",
+  OTHER: "其他"
+};
+const monitorRuleNames: Record<string, string> = {
+  memory: "物理内存",
+  heap: "堆内存",
+  disk: "磁盘",
+  database: "数据库",
+  agent: "健康检查",
+  "model-calls": "模型调用",
+  jobs: "后台任务",
+  errors: "错误日志"
+};
+const databaseNames: Record<string, string> = {
+  H2: "H2（开发或便携版）",
+  POSTGRESQL: "PostgreSQL"
+};
 const tokens = (value: number) => value.toLocaleString();
 const tokenLimit = (value: number) => (value > 0 ? tokens(value) : "不设上限");
 const tokenPercent = (used: number, limit: number) =>
@@ -58,6 +101,10 @@ const load = () =>
         ]);
         return { health: ops.data, tokenBudget: budget?.data };
       }
+      if (tab.value === "mail")
+        return { mail: (await getClosetMailUsage(mailDays.value)).data };
+      if (tab.value === "monitor")
+        return { monitor: (await getClosetMonitor()).data };
       if (tab.value === "tasks")
         return {
           tasks: (
@@ -87,6 +134,8 @@ const load = () =>
     result => {
       health.value = result.health;
       tokenBudget.value = result.tokenBudget;
+      mail.value = result.mail;
+      monitor.value = result.monitor;
       tasks.value = result.tasks;
       logs.value = result.logs;
     }
@@ -112,9 +161,24 @@ onMounted(() => void load());
       </p>
       <el-tabs v-model="tab" class="mt-3"
         ><el-tab-pane label="服务健康" name="status" /><el-tab-pane
+          label="邮件"
+          name="mail" /><el-tab-pane
+          label="监控规则"
+          name="monitor" /><el-tab-pane
           label="后台任务"
           name="tasks" /><el-tab-pane label="操作日志" name="logs"
       /></el-tabs>
+      <div v-if="tab === 'mail'" class="flex flex-wrap items-center gap-3">
+        <span class="text-sm">统计最近</span
+        ><el-input-number
+          v-model="mailDays"
+          :min="1"
+          :max="30"
+          :precision="0"
+          aria-label="统计天数"
+        /><span class="text-sm">天</span
+        ><el-button @click="search">查询</el-button>
+      </div>
       <div v-if="tab === 'tasks'" class="flex flex-wrap gap-3">
         <el-select
           v-model="statusFilter"
@@ -234,6 +298,26 @@ onMounted(() => void load());
             }}</el-descriptions-item></el-descriptions
           >
         </el-card>
+        <el-card shadow="never"
+          ><template #header>数据库</template>
+          <el-descriptions
+            v-if="health.database"
+            :column="width < 768 ? 1 : 2"
+            border
+            ><el-descriptions-item label="类型">{{
+              databaseNames[health.database.vendor] ?? health.database.vendor
+            }}</el-descriptions-item
+            ><el-descriptions-item label="迁移版本">{{
+              health.database.schemaVersion ?? "未取到"
+            }}</el-descriptions-item
+            ><el-descriptions-item label="库文件大小">{{
+              bytes(health.storage.databaseBytes)
+            }}</el-descriptions-item></el-descriptions
+          >
+          <p v-else class="text-sm">
+            当前鱼搭版本没有提供数据库信息。
+          </p></el-card
+        >
         <el-card v-if="tokenBudget" shadow="never"
           ><template #header
             ><div class="flex flex-wrap justify-between gap-2">
@@ -333,6 +417,116 @@ onMounted(() => void load());
           ></el-card
         >
       </template>
+      <template v-if="tab === 'mail' && mail">
+        <el-card shadow="never"
+          ><template #header
+            ><div class="flex flex-wrap justify-between gap-2">
+              <el-tag :type="mail.enabled ? 'success' : 'info'">{{
+                mail.enabled ? "邮件模块已开启" : "邮件模块未开启"
+              }}</el-tag
+              ><el-tag
+                v-if="mail.enabled"
+                :type="mail.available ? 'success' : 'warning'"
+                >{{
+                  mail.available ? "配置齐全，可发信" : "配置不全，暂不能发信"
+                }}</el-tag
+              >
+            </div></template
+          >
+          <el-descriptions :column="width < 768 ? 1 : 2" border
+            ><el-descriptions-item label="今日已发 / 日上限"
+              >{{ mail.usedToday }} /
+              {{ mail.dailyLimit }}</el-descriptions-item
+            ><el-descriptions-item label="普通邮件上限（其余留给告警）">{{
+              mail.ordinaryLimit
+            }}</el-descriptions-item
+            ><el-descriptions-item label="投递记录保留"
+              >{{ mail.logRetentionDays }} 天</el-descriptions-item
+            ></el-descriptions
+          >
+          <p class="mt-3 text-xs text-[var(--el-text-color-secondary)]">
+            只统计用途、状态与错误分类，不含收件人、主题与正文。日期按北京时间。
+          </p>
+        </el-card>
+        <el-card shadow="never"
+          ><template #header>最近 {{ mail.days }} 天投递</template
+          ><el-table :data="mail.byDay" empty-text="这段时间没有投递记录"
+            ><el-table-column
+              prop="date"
+              label="日期"
+              width="130" /><el-table-column label="用途" min-width="150"
+              ><template #default="{ row }">{{
+                mailPurposeNames[row.purpose] ?? row.purpose
+              }}</template></el-table-column
+            ><el-table-column label="结果" width="110"
+              ><template #default="{ row }">{{
+                mailStatusNames[row.status] ?? row.status
+              }}</template></el-table-column
+            ><el-table-column prop="count" label="数量" width="90"
+          /></el-table>
+          <template v-if="mail.errors.length"
+            ><h3 class="mt-4 mb-2 text-sm font-semibold">错误分类</h3>
+            <el-table :data="mail.errors"
+              ><el-table-column label="分类"
+                ><template #default="{ row }">{{
+                  mailErrorNames[row.errorKind] ?? row.errorKind
+                }}</template></el-table-column
+              ><el-table-column prop="count" label="数量" /></el-table
+          ></template>
+        </el-card>
+      </template>
+      <template v-if="tab === 'monitor' && monitor">
+        <el-card shadow="never"
+          ><template #header
+            ><div class="flex flex-wrap justify-between gap-2">
+              <el-tag :type="monitor.enabled ? 'success' : 'info'">{{
+                monitor.enabled ? "监控已开启" : "监控未开启"
+              }}</el-tag
+              ><span v-if="monitor.enabled" class="text-sm"
+                >每 {{ monitor.intervalSeconds }} 秒检查 ·
+                {{
+                  monitor.alertConfigured
+                    ? "已配置告警收件人"
+                    : "未配置告警收件人"
+                }}</span
+              >
+            </div></template
+          >
+          <el-table :data="monitor.rules" empty-text="监控未开启，没有规则状态"
+            ><el-table-column label="规则" min-width="110"
+              ><template #default="{ row }">{{
+                monitorRuleNames[row.rule] ?? row.rule
+              }}</template></el-table-column
+            ><el-table-column label="状态" width="100"
+              ><template #default="{ row }"
+                ><el-tag :type="row.firing ? 'danger' : 'success'">{{
+                  row.firing ? "告警中" : "正常"
+                }}</el-tag></template
+              ></el-table-column
+            ><el-table-column label="告警起始" min-width="170"
+              ><template #default="{ row }">{{
+                formatTime(row.sinceMs)
+              }}</template></el-table-column
+            ><el-table-column label="当前读数" min-width="160"
+              ><template #default="{ row }">{{
+                row.reading ?? "—"
+              }}</template></el-table-column
+            ><el-table-column
+              prop="threshold"
+              label="阈值"
+              min-width="200"
+              show-overflow-tooltip
+            /><el-table-column label="最近检查" min-width="170"
+              ><template #default="{ row }">{{
+                formatTime(row.lastCheckedMs)
+              }}</template></el-table-column
+            ></el-table
+          >
+          <p class="mt-3 text-xs text-[var(--el-text-color-secondary)]">
+            监控规则只读；告警邮件不含用户名与任何用户内容。
+          </p>
+        </el-card>
+      </template>
       <el-card v-if="tab === 'tasks' && tasks" shadow="never"
         ><el-table :data="tasks.items" row-key="id"
           ><el-table-column type="expand"
@@ -407,7 +601,7 @@ onMounted(() => void load());
             show-overflow-tooltip /></el-table
       ></el-card>
       <el-pagination
-        v-if="tab !== 'status' && (tasks || logs)"
+        v-if="(tab === 'tasks' || tab === 'logs') && (tasks || logs)"
         v-model:current-page="page"
         v-model:page-size="size"
         :total="(tasks ?? logs)?.totalElements ?? 0"
