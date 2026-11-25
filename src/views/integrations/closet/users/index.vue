@@ -294,6 +294,14 @@ onMounted(load);
               registeredViaNames[row.registeredVia] ?? row.registeredVia ?? "—"
             }}</template>
           </el-table-column>
+          <el-table-column label="邮箱" min-width="150">
+            <template #default="{ row }"
+              ><span v-if="row.emailBound" class="font-mono text-xs">{{
+                row.emailMasked ?? "已绑定"
+              }}</span
+              ><span v-else class="text-placeholder">未绑定</span></template
+            >
+          </el-table-column>
           <el-table-column label="衣物 / 搭配" min-width="100" align="right">
             <template #default="{ row }"
               ><span class="tabular-nums"

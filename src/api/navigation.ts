@@ -32,6 +32,7 @@ export type NavigationMenu = {
     | "closet-ops"
     | "closet-exports"
     | "closet-templates"
+    | "closet-samples"
     | "closet-style-terms"
     | "closet-feedback"
     | "closet-tryon"

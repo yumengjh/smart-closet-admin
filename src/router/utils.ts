@@ -55,6 +55,8 @@ export const routeComponentRegistry: Record<
     import("@/views/integrations/closet/exports/index.vue"),
   "closet-templates": () =>
     import("@/views/integrations/closet/templates/index.vue"),
+  "closet-samples": () =>
+    import("@/views/integrations/closet/samples/index.vue"),
   "closet-style-terms": () =>
     import("@/views/integrations/closet/style-terms/index.vue"),
   "closet-feedback": () =>

@@ -466,6 +466,12 @@ const clearTemporaryPassword = () => {
               <el-descriptions-item label="注册来源">{{
                 registeredViaNames[detail.registeredVia] ?? detail.registeredVia
               }}</el-descriptions-item>
+              <el-descriptions-item label="邮箱">
+                <span v-if="detail.emailBound" class="font-mono text-xs">{{
+                  detail.emailMasked ?? "已绑定"
+                }}</span>
+                <span v-else class="text-placeholder">未绑定</span>
+              </el-descriptions-item>
               <el-descriptions-item label="注册邀请码">
                 <el-tooltip v-if="detail.inviteId" :content="detail.inviteId"
                   ><span class="font-mono text-xs">{{

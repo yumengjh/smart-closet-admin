@@ -32,6 +32,10 @@ export type ClosetUserSummary = {
   activeSessionCount: number;
   garmentCount: number;
   outfitCount: number;
+  /** 是否绑定了验证过的邮箱（1.10）；接口不返回邮箱全文。 */
+  emailBound?: boolean;
+  /** 打码邮箱，未绑定为 null。 */
+  emailMasked?: string | null;
 };
 export type ClosetUserDetail = ClosetUserSummary & {
   inviteId: string | null;

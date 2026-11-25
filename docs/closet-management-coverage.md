@@ -39,6 +39,12 @@
 - 会话分别展示 HTTP 创建、RTC 完成、首帧与各阶段耗时。未完成阶段显示“未完成或未上报”，不填零。UNKNOWN 仍保留预算，停止请求不等于已完成结算。
 - 不新增图片、录像或私人媒体读取入口；大屏与数仓原有去标识边界保持。
 
+## 1.11 补充
+
+- 运行监控新增“数据库”（`/ops/status` 的 `database`：类型与迁移版本）、“邮件”（`/ops/mail`，今日用量、近 N 天分用途与状态计数、错误分类，不含收件人与正文）、“监控规则”（`/ops/monitor`，规则、状态、读数、阈值、最近检查，只读）三块，沿用 `closet:ops:read`。
+- 新页面“整套样本”（`/closet/samples`，组件键 `closet-samples`）：列表与状态筛选、统计、上传、详情抽屉（原图、提取结果 JSON 编辑、提取、审核、生成模板草稿、删除）。查看需 `closet:samples:read`，写入需 `closet:samples:write`。原图审核完成即删除，生成的模板草稿到“模板审核”处理。
+- 业务用户列表与详情显示 `emailBound` 与打码的 `emailMasked`（1.10），页面不会出现邮箱全文。
+
 ## 版本入口
 
 鱼搭后端版本在“运行监控”中显示包版本 `app.version`、发版版本 `app.buildVersion` 与提交号 `app.commit`。没有 CI 构建信息时显示源服务给出的 `dev/unknown` 或“未提供”。管理后端自己的版本在启动日志 `Version` 或受权限保护的 `/actuator/info` 构建信息中，默认来自 `pom.xml` 的 `revision`，CI 可在构建时覆盖。两者不混为同一个版本。
