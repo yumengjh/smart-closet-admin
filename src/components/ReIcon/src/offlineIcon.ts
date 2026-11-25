@@ -9,6 +9,9 @@ import EpHomeFilled from "~icons/ep/home-filled?raw";
 import RiSettings3Line from "~icons/ri/settings-3-line?raw";
 import RiImageLine from "~icons/ri/image-line?raw";
 import RiImageAddLine from "~icons/ri/image-add-line?raw";
+import RiImageEditLine from "~icons/ri/image-edit-line?raw";
+import RiBookOpenLine from "~icons/ri/book-open-line?raw";
+import RiMoneyCnyCircleLine from "~icons/ri/money-cny-circle-line?raw";
 import RiGalleryLine from "~icons/ri/gallery-line?raw";
 import RiBarChartLine from "~icons/ri/bar-chart-line?raw";
 import RiUserSettingsLine from "~icons/ri/user-settings-line?raw";
@@ -46,6 +49,9 @@ const icons = [
   ["ri/settings-3-line", RiSettings3Line],
   ["ri/image-line", RiImageLine],
   ["ri/image-add-line", RiImageAddLine],
+  ["ri/image-edit-line", RiImageEditLine],
+  ["ri/book-open-line", RiBookOpenLine],
+  ["ri/money-cny-circle-line", RiMoneyCnyCircleLine],
   ["ri/gallery-line", RiGalleryLine],
   ["ri/bar-chart-line", RiBarChartLine],
   ["ri/user-settings-line", RiUserSettingsLine],
