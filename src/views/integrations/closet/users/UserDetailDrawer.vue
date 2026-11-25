@@ -470,7 +470,12 @@ const clearTemporaryPassword = () => {
                 <span v-if="detail.emailBound" class="font-mono text-xs">{{
                   detail.emailMasked ?? "已绑定"
                 }}</span>
-                <span v-else class="text-placeholder">未绑定</span>
+                <span
+                  v-else-if="detail.emailBound === false"
+                  class="text-placeholder"
+                  >未绑定</span
+                >
+                <span v-else class="text-placeholder">—</span>
               </el-descriptions-item>
               <el-descriptions-item label="注册邀请码">
                 <el-tooltip v-if="detail.inviteId" :content="detail.inviteId"

@@ -299,7 +299,11 @@ onMounted(load);
               ><span v-if="row.emailBound" class="font-mono text-xs">{{
                 row.emailMasked ?? "已绑定"
               }}</span
-              ><span v-else class="text-placeholder">未绑定</span></template
+              ><span
+                v-else-if="row.emailBound === false"
+                class="text-placeholder"
+                >未绑定</span
+              ><span v-else class="text-placeholder">—</span></template
             >
           </el-table-column>
           <el-table-column label="衣物 / 搭配" min-width="100" align="right">
