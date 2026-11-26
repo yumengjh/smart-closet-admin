@@ -43,7 +43,6 @@ export type NavigationMenu = {
     | "closet-billing-redemptions"
     | "closet-billing-margin"
     | "closet-creation-templates"
-    | "closet-creation-capabilities"
     | "closet-creation-usage"
     | "closet-presets"
     | "closet-onboarding"

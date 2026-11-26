@@ -56,7 +56,6 @@ assert.match(page, /if \(row\.capability === "IMAGE"\) return/);
 assert.match(page, /v-if="row\.capability !== 'IMAGE'"/);
 assert.match(page, /row\.kind === "REROUTED"\s*\?\s*entryName\(row\.code\)/);
 const apiSource = await read("src/api/closet/models.ts");
-assert.match(apiSource, /inUse: "ACTIVE" \| "FALLBACK" \| null/);
 assert.match(apiSource, /deleteRouting[\s\S]*ApiResponse<ModelRouting>/);
 assert.match(apiSource, /resumeEntry[\s\S]*ApiResponse<ModelEntry>/);
 const router = await read("src/router/utils.ts");

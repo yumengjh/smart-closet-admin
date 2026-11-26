@@ -2,6 +2,7 @@ import { http } from "@/utils/http";
 import type { ApiResponse } from "../user";
 
 export type Capability = "VISION" | "IMAGE" | "CHAT";
+export type RoutingSlot = Capability | "PORTRAIT";
 export type ProviderKind = "OPENAI_COMPATIBLE" | "GEMINI";
 export type ModelProtocol =
   | "OPENAI_CHAT"
@@ -52,7 +53,7 @@ export type ModelEntry = {
   enabled: boolean;
   source: ModelSource;
   revision: number;
-  inUse: "ACTIVE" | "FALLBACK" | null;
+  inUse: "ACTIVE" | "FALLBACK" | "PORTRAIT_ACTIVE" | "PORTRAIT_FALLBACK" | null;
   deletable: boolean;
   editable: boolean;
   references?: ModelReferences;
@@ -63,6 +64,7 @@ export type ModelRouting = {
   fallback: string | null;
   effective: string | null;
   configured: boolean;
+  followsImage?: boolean;
   revision: number;
   updatedAtMs: number | null;
 };
@@ -71,7 +73,7 @@ export type ModelOverview = {
   failoverEnabled: boolean;
   providers: ModelProvider[];
   entries: ModelEntry[];
-  routing: Partial<Record<Capability, ModelRouting>>;
+  routing: Partial<Record<RoutingSlot, ModelRouting>>;
   events: {
     atMs: number;
     capability: Capability;
@@ -178,7 +180,7 @@ export const testEntry = (id: string) =>
     { timeout: 190000 }
   );
 export const putRouting = (
-  capability: Capability,
+  capability: RoutingSlot,
   data: { active: string; fallback: string | null; revision: number }
 ) =>
   http.request<ApiResponse<ModelRouting>>(
@@ -186,7 +188,7 @@ export const putRouting = (
     `${root}/routing/${capability}`,
     { data }
   );
-export const deleteRouting = (capability: Capability) =>
+export const deleteRouting = (capability: RoutingSlot) =>
   http.request<ApiResponse<ModelRouting>>(
     "delete",
     `${root}/routing/${capability}`

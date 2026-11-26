@@ -25,7 +25,8 @@ import {
   type ModelProtocol,
   type ModelProvider,
   type ProviderKind,
-  type ReferenceOverLimit
+  type ReferenceOverLimit,
+  type RoutingSlot
 } from "@/api/closet/models";
 import ClosetUnavailable from "../ClosetUnavailable.vue";
 import { formatTime, useClosetRequest } from "../useClosetRequest";
@@ -37,15 +38,21 @@ const writable = computed(() => can("closet:models:write"));
 const { loading, unavailable, errorMessage, run } = useClosetRequest();
 const overview = ref<ModelOverview>();
 const capabilities: Capability[] = ["VISION", "IMAGE", "CHAT"];
+const routingSlots: RoutingSlot[] = [...capabilities, "PORTRAIT"];
 const capabilityNames: Record<Capability, string> = {
   VISION: "识图",
   IMAGE: "生图",
   CHAT: "对话"
 };
-const descriptions: Record<Capability, string> = {
+const routingNames: Record<RoutingSlot, string> = {
+  ...capabilityNames,
+  PORTRAIT: "形象图"
+};
+const descriptions: Record<RoutingSlot, string> = {
   VISION: "识图用于衣物识别、整套样本和穿搭收藏拆解。",
   IMAGE: "生图用于整理衣物照、上身图和创作。",
-  CHAT: "对话用于鱼搭助手。"
+  CHAT: "对话用于鱼搭助手。",
+  PORTRAIT: "生成‘我的形象’底图时用的模型。不单独选就跟随生图。"
 };
 const statusNames = {
   READY: "正常",
@@ -60,11 +67,12 @@ const eventNames = {
   MANUAL_RESUME: "手动恢复"
 };
 const routingForms = reactive<
-  Record<Capability, { active: string; fallback: string | null }>
+  Record<RoutingSlot, { active: string; fallback: string | null }>
 >({
   VISION: { active: "", fallback: null },
   IMAGE: { active: "", fallback: null },
-  CHAT: { active: "", fallback: null }
+  CHAT: { active: "", fallback: null },
+  PORTRAIT: { active: "", fallback: null }
 });
 const tab = ref<Capability>("VISION");
 const pageTab = ref("config");
@@ -72,7 +80,7 @@ const busy = ref(false);
 const load = () =>
   run(getModels, ({ data }) => {
     overview.value = data;
-    for (const capability of capabilities) {
+    for (const capability of routingSlots) {
       const routing = data.routing[capability];
       routingForms[capability] = {
         active: routing?.active ?? "",
@@ -88,10 +96,10 @@ const entryName = (id?: string | null) => {
     ? `${entry.label || entry.model} · ${providerName(entry.providerId)}`
     : id || "—";
 };
-const eligible = (capability: Capability) =>
+const eligible = (capability: RoutingSlot) =>
   overview.value?.entries.filter(
     entry =>
-      entry.capability === capability &&
+      entry.capability === (capability === "PORTRAIT" ? "IMAGE" : capability) &&
       entry.enabled &&
       overview.value?.providers.some(
         provider =>
@@ -154,7 +162,7 @@ const confirm = async (text: string, title: string) => {
     return false;
   }
 };
-const saveRouting = async (capability: Capability) => {
+const saveRouting = async (capability: RoutingSlot) => {
   const form = routingForms[capability];
   if (!form.active || form.active === form.fallback) {
     message("请选择不同的生效模型和备用模型", { type: "warning" });
@@ -167,6 +175,17 @@ const saveRouting = async (capability: Capability) => {
       revision: overview.value?.routing[capability]?.revision ?? 0
     })
   );
+};
+const followImage = async (value: string) => {
+  if (value) return;
+  if (overview.value?.routing.PORTRAIT?.followsImage) {
+    routingForms.PORTRAIT.fallback = null;
+    return;
+  }
+  if (!(await mutate(() => deleteRouting("PORTRAIT")))) {
+    routingForms.PORTRAIT.active =
+      overview.value?.routing.PORTRAIT?.active ?? "";
+  }
 };
 const resetRouting = async (capability: Capability) => {
   if (
@@ -567,17 +586,17 @@ onMounted(() => {
                 <p class="text-xs text-gray-500">
                   新任务立即使用这里选的模型；已经排队的任务继续用提交时的模型。生效模型连续失败
                   3 次会暂停 10
-                  分钟，期间新任务和排队中的整理、识图任务改用备用，到期自动试回；上身图和创作不改用备用。
+                  分钟，期间新任务和排队中的整理、识图任务改用备用，到期自动试回；上身图和创作不改用备用。上身图和创作跟随生图。
                 </p>
               </div></template
             >
             <div class="routing-grid">
               <div
-                v-for="capability in capabilities"
+                v-for="capability in routingSlots"
                 :key="capability"
                 class="space-y-3"
               >
-                <h3 class="font-medium">{{ capabilityNames[capability] }}</h3>
+                <h3 class="font-medium">{{ routingNames[capability] }}</h3>
                 <p class="text-xs text-gray-500">
                   {{ descriptions[capability] }}
                 </p>
@@ -586,9 +605,13 @@ onMounted(() => {
                   <el-select
                     v-model="routingForms[capability].active"
                     class="w-full"
-                    :disabled="!writable"
+                    :disabled="!writable || busy"
                     placeholder="请选择"
+                    @change="capability === 'PORTRAIT' && followImage($event)"
                     ><el-option
+                      v-if="capability === 'PORTRAIT'"
+                      value=""
+                      label="跟随生图" /><el-option
                       v-for="entry in eligible(capability)"
                       :key="entry.id"
                       :value="entry.id"
@@ -600,7 +623,12 @@ onMounted(() => {
                   <el-select
                     v-model="routingForms[capability].fallback"
                     class="w-full"
-                    :disabled="!writable"
+                    :disabled="
+                      !writable ||
+                      busy ||
+                      (capability === 'PORTRAIT' &&
+                        !routingForms.PORTRAIT.active)
+                    "
                     clearable
                     placeholder="不设备用"
                     ><el-option
@@ -612,11 +640,26 @@ onMounted(() => {
                   /></el-select>
                 </div>
                 <div>
-                  实际在用：{{
-                    entryName(overview.routing[capability]?.effective)
+                  实际在用：<template
+                    v-if="
+                      capability === 'PORTRAIT' &&
+                      overview.routing.PORTRAIT?.followsImage
+                    "
+                    >跟随生图：</template
+                  >{{
+                    entryName(
+                      capability === "PORTRAIT" &&
+                        overview.routing.PORTRAIT?.followsImage
+                        ? overview.routing.IMAGE?.effective
+                        : overview.routing[capability]?.effective
+                    )
                   }}
                   <el-tag
                     v-if="
+                      !(
+                        capability === 'PORTRAIT' &&
+                        overview.routing.PORTRAIT?.followsImage
+                      ) &&
                       overview.routing[capability]?.effective &&
                       overview.routing[capability]?.effective !==
                         overview.routing[capability]?.active
@@ -630,7 +673,11 @@ onMounted(() => {
                     healthText(
                       overview.entries.find(
                         entry =>
-                          entry.id === overview.routing[capability]?.active
+                          entry.id ===
+                          (capability === "PORTRAIT" &&
+                          overview.routing.PORTRAIT?.followsImage
+                            ? overview.routing.IMAGE?.active
+                            : overview.routing[capability]?.active)
                       )?.health
                     )
                   }}
@@ -638,10 +685,16 @@ onMounted(() => {
                 <div>
                   <el-button
                     type="primary"
-                    :disabled="!writable || busy"
+                    :disabled="
+                      !writable ||
+                      busy ||
+                      (capability === 'PORTRAIT' &&
+                        !routingForms.PORTRAIT.active)
+                    "
                     @click="saveRouting(capability)"
                     >保存</el-button
                   ><el-button
+                    v-if="capability !== 'PORTRAIT'"
                     :disabled="
                       !writable ||
                       busy ||
@@ -770,15 +823,7 @@ onMounted(() => {
                 :name="capability"
             /></el-tabs>
             <p v-if="tab === 'IMAGE'" class="help">
-              设了生图路由后，生图模型自动用于上身图、形象图和创作；参考图超过上限时按每个模型的“参考图设置”处理。
-              <router-link
-                :to="{
-                  name: 'ClosetCreationCapabilities',
-                  query: { purpose: 'OOTD' }
-                }"
-              >
-                模型能力（只在没设生图路由时使用）
-              </router-link>
+              上身图和创作跟随生图；形象图可单独选择模型。参考图超过上限时按每个模型的“参考图设置”处理。
             </p>
             <el-table
               :data="overview.entries.filter(entry => entry.capability === tab)"
@@ -825,7 +870,11 @@ onMounted(() => {
                     ? "生效"
                     : row.inUse === "FALLBACK"
                       ? "备用"
-                      : "—"
+                      : row.inUse === "PORTRAIT_ACTIVE"
+                        ? "形象图生效"
+                        : row.inUse === "PORTRAIT_FALLBACK"
+                          ? "形象图备用"
+                          : "—"
                 }}</template></el-table-column
               >
               <el-table-column label="开启" width="75"
@@ -884,7 +933,7 @@ onMounted(() => {
                     :content="
                       row.source === 'CONFIG'
                         ? '部署配置不能删除'
-                        : '正在被选为生效或备用的模型不能删除'
+                        : '正在被选为生效或备用（含形象图）的模型不能删除'
                     "
                     :disabled="row.deletable"
                     ><span
@@ -1225,7 +1274,7 @@ onMounted(() => {
 
 .routing-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1.5rem;
 }
 

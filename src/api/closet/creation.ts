@@ -77,33 +77,6 @@ export type VersionEdit = Pick<
   | "model"
   | "capabilityVersion"
 >;
-export type CapabilityPurpose = "ART_CREATION" | "OOTD" | "BASELINE";
-export type CapabilityPurposeFilter = CapabilityPurpose | "ALL";
-export type Capability = {
-  provider: string;
-  model: string;
-  purpose: CapabilityPurpose;
-  maxReferences: number;
-  verified: boolean;
-  version: number;
-  verifiedAt: number | null;
-  providerRevision: string | null;
-  notes: string;
-  outputOptions: Record<string, unknown>;
-  outputCount: number;
-  pricingKey: string;
-};
-export type CapabilityEdit = Pick<
-  Capability,
-  | "provider"
-  | "model"
-  | "purpose"
-  | "maxReferences"
-  | "verified"
-  | "version"
-  | "notes"
-  | "outputOptions"
->;
 export type CreationGenerationOption = {
   provider: string;
   model: string;
@@ -156,21 +129,11 @@ export const retireCreationTemplate = (id: string, revision: number) =>
   http.request<ApiResponse<unknown>>("post", `${template(id)}/retire`, {
     data: { revision }
   });
-export const getCreationCapabilities = (purpose?: CapabilityPurposeFilter) =>
-  http.request<ApiResponse<{ items: Capability[] }>>(
-    "get",
-    `${root}/capabilities`,
-    { params: { purpose } }
-  );
 export const getCreationGenerationOptions = () =>
   http.request<ApiResponse<CreationGenerationOptions>>(
     "get",
     `${root}/generation-options`
   );
-export const saveCreationCapability = (data: CapabilityEdit) =>
-  http.request<ApiResponse<Capability>>("put", `${root}/capabilities`, {
-    data
-  });
 
 export type TrialGarment = {
   id: string;
