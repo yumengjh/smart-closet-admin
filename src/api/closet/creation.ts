@@ -77,10 +77,12 @@ export type VersionEdit = Pick<
   | "model"
   | "capabilityVersion"
 >;
+export type CapabilityPurpose = "ART_CREATION" | "OOTD" | "BASELINE";
+export type CapabilityPurposeFilter = CapabilityPurpose | "ALL";
 export type Capability = {
   provider: string;
   model: string;
-  purpose: "ART_CREATION";
+  purpose: CapabilityPurpose;
   maxReferences: number;
   verified: boolean;
   version: number;
@@ -154,10 +156,11 @@ export const retireCreationTemplate = (id: string, revision: number) =>
   http.request<ApiResponse<unknown>>("post", `${template(id)}/retire`, {
     data: { revision }
   });
-export const getCreationCapabilities = () =>
+export const getCreationCapabilities = (purpose?: CapabilityPurposeFilter) =>
   http.request<ApiResponse<{ items: Capability[] }>>(
     "get",
-    `${root}/capabilities`
+    `${root}/capabilities`,
+    { params: { purpose } }
   );
 export const getCreationGenerationOptions = () =>
   http.request<ApiResponse<CreationGenerationOptions>>(

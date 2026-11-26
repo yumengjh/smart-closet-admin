@@ -1,17 +1,29 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import {
   getCreationCapabilities,
   getCreationGenerationOptions,
   saveCreationCapability,
   type Capability,
   type CapabilityEdit,
+  type CapabilityPurpose,
   type CreationGenerationOptions
 } from "@/api/closet/creation";
 import { useCurrentPermissions } from "@/composables/useCurrentPermissions";
 import { message } from "@/utils/message";
 defineOptions({ name: "ClosetCreationCapabilities" });
 const { can } = useCurrentPermissions();
+const route = useRoute();
+const purposes: CapabilityPurpose[] = ["ART_CREATION", "OOTD", "BASELINE"];
+const purpose = ref<CapabilityPurpose>("ART_CREATION");
+const purposeDescriptions: Record<CapabilityPurpose, string> = {
+  ART_CREATION:
+    "创作模板试做和发布时用到的模型；模板版本会固定自己的模型，不跟生图路由切换。",
+  OOTD: "试穿页做上身图时可选的模型。列表按生图路由排序，生效模型在前；参考图上限要够人物加整套衣物（例如 3.0 系列只有 3 张）。",
+  BASELINE: "生成形象图（人物底图）时可选的模型，通常只需要 1 张参考照片。"
+};
+let capabilitiesRequest = 0;
 const rows = ref<Capability[]>([]);
 const loading = ref(false);
 const saving = ref(false);
@@ -64,13 +76,16 @@ function applyDefaultSelection() {
   form.value.model = defaultSelection.value?.model ?? "";
 }
 async function refreshCapabilities() {
+  const request = ++capabilitiesRequest;
+  const requestedPurpose = purpose.value;
   loading.value = true;
   try {
-    rows.value = (await getCreationCapabilities()).data.items;
+    const result = await getCreationCapabilities(requestedPurpose);
+    if (request === capabilitiesRequest) rows.value = result.data.items;
   } catch (e) {
-    fail(e);
+    if (request === capabilitiesRequest) fail(e);
   } finally {
-    loading.value = false;
+    if (request === capabilitiesRequest) loading.value = false;
   }
 }
 async function refreshGenerationOptions() {
@@ -116,7 +131,7 @@ function edit(row?: Capability) {
     ? {
         provider: row.provider,
         model: row.model,
-        purpose: "ART_CREATION",
+        purpose: purpose.value,
         maxReferences: row.maxReferences,
         verified: row.verified,
         version: row.version,
@@ -126,7 +141,7 @@ function edit(row?: Capability) {
     : {
         provider: "",
         model: "",
-        purpose: "ART_CREATION",
+        purpose: purpose.value,
         maxReferences: 1,
         verified: false,
         version: 0,
@@ -161,11 +176,18 @@ function changeProvider(provider: string) {
 }
 async function save() {
   if (!form.value || !canSave.value) return;
+  if (form.value.verified && !form.value.notes.trim()) {
+    message("已验证的模型须填写验证说明", { type: "warning" });
+    return;
+  }
   try {
-    const text = optionsText.value.trim();
-    const options = text ? JSON.parse(text) : {};
-    if (!options || Array.isArray(options) || typeof options !== "object")
-      throw new Error("invalid");
+    let options: Record<string, unknown> = {};
+    if (form.value.purpose === "ART_CREATION") {
+      const text = optionsText.value.trim();
+      options = text ? JSON.parse(text) : {};
+      if (!options || Array.isArray(options) || typeof options !== "object")
+        throw new Error("invalid");
+    }
     saving.value = true;
     await saveCreationCapability({ ...form.value, outputOptions: options });
     open.value = false;
@@ -182,6 +204,19 @@ async function save() {
     saving.value = false;
   }
 }
+watch(
+  () => route.query.purpose,
+  value => {
+    purpose.value = purposes.includes(value as CapabilityPurpose)
+      ? (value as CapabilityPurpose)
+      : "ART_CREATION";
+  },
+  { immediate: true }
+);
+watch(purpose, () => {
+  rows.value = [];
+  if (can("closet:creation:read")) void refreshCapabilities();
+});
 onMounted(() => {
   if (can("closet:creation:read")) refreshAll();
 });
@@ -189,8 +224,14 @@ onMounted(() => {
 <template>
   <section class="creation-page">
     <h1>模型高级设置</h1>
-    <p class="caption">人工记录穿搭创作能力与验证结论；此操作不会调用模型。</p>
-    <p class="caption">
+    <p class="caption">人工记录模型能力与验证结论；此操作不会调用模型。</p>
+    <el-tabs v-model="purpose">
+      <el-tab-pane label="创作" name="ART_CREATION" />
+      <el-tab-pane label="上身图" name="OOTD" />
+      <el-tab-pane label="形象图" name="BASELINE" />
+    </el-tabs>
+    <p class="caption">{{ purposeDescriptions[purpose] }}</p>
+    <p v-if="purpose === 'ART_CREATION'" class="caption">
       在收费管理的成本费率中使用成本标识配置对应模型的费率。
     </p>
     <div class="toolbar">
@@ -208,7 +249,11 @@ onMounted(() => {
         label="供应商"
         min-width="120"
       /><el-table-column prop="model" label="模型" min-width="140" />
-      <el-table-column label="成本标识" min-width="240">
+      <el-table-column
+        v-if="purpose === 'ART_CREATION'"
+        label="成本标识"
+        min-width="240"
+      >
         <template #default="{ row }">
           <template v-if="row.pricingKey">
             <span class="pricing-key">{{ row.pricingKey }}</span>
@@ -374,10 +419,18 @@ onMounted(() => {
             active-text="已验证"
             inactive-text="未验证"
         /></el-form-item>
-        <el-form-item label="验证说明"
-          ><el-input v-model="form.notes" type="textarea" :rows="3"
-        /></el-form-item>
-        <el-form-item label="输出参数覆盖（JSON 对象，可留空继承供应商默认值）">
+        <el-form-item label="验证说明" :required="form.verified">
+          <el-input
+            v-model="form.notes"
+            type="textarea"
+            :rows="3"
+            placeholder="写明怎么验证的，例如：用某套搭配试做成功，效果可用。"
+          />
+        </el-form-item>
+        <el-form-item
+          v-if="form.purpose === 'ART_CREATION'"
+          label="输出参数覆盖（JSON 对象，可留空继承供应商默认值）"
+        >
           <el-input v-model="optionsText" type="textarea" :rows="6" />
           <p class="caption">
             这里只保存本条能力的覆盖参数；留空或填写 {} 都会继承供应商默认参数。
@@ -404,19 +457,23 @@ onMounted(() => {
 .creation-page {
   padding: 24px;
 }
+
 .caption {
   color: var(--el-text-color-secondary);
 }
+
 .toolbar {
   display: flex;
   gap: 8px;
   margin: 20px 0;
 }
+
 .pricing-key {
   overflow-wrap: anywhere;
   user-select: all;
 }
-@media (max-width: 600px) {
+
+@media (width <= 600px) {
   .creation-page {
     padding: 16px;
   }

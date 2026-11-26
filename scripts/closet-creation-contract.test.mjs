@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import ts from "typescript";
+import * as vue from "vue";
+import { parse, compileScript } from "vue/compiler-sfc";
 
 // Exercise the public API functions against a recording transport, without a backend.
 const source = await readFile(
@@ -168,6 +170,10 @@ for (const [name, args, method, path, data] of cases) {
   if (name.endsWith("Image"))
     assert.equal(calls[0][2].responseType, "blob", name);
 }
+for (const purpose of ["ART_CREATION", "OOTD", "BASELINE", "ALL"]) {
+  await exports.getCreationCapabilities(purpose);
+  assert.equal(calls.at(-1)[2].params.purpose, purpose);
+}
 await exports.getCreationVersion("sunlit-flatlay", "v/a");
 assert.ok(calls.at(-1)[1].endsWith("v%2Fa"), "version IDs must be encoded");
 
@@ -237,6 +243,73 @@ for (const [route, key, icon, view] of creationPages) {
     `offline icon import or registration missing for ${icon}`
   );
 }
+const capabilitySource = await readProjectFile("../src/views/integrations/closet/creation/Capabilities.vue");
+const { descriptor } = parse(capabilitySource);
+const componentSource = compileScript(descriptor, { id: "capabilities" }).content;
+const componentJs = ts.transpileModule(componentSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+}).outputText;
+const componentExports = {};
+const route = vue.reactive({ query: { purpose: "OOTD" } });
+const requests = [];
+const saved = [];
+const messages = [];
+const modules = {
+  vue: { ...vue, onMounted: () => {} },
+  "vue-router": { useRoute: () => route },
+  "@/api/closet/creation": {
+    getCreationCapabilities: async purpose => {
+      requests.push(purpose);
+      return { data: { items: [] } };
+    },
+    getCreationGenerationOptions: async () => ({ data: { providers: [] } }),
+    saveCreationCapability: async data => { saved.push(data); }
+  },
+  "@/composables/useCurrentPermissions": { useCurrentPermissions: () => ({ can: () => true }) },
+  "@/utils/message": { message: text => messages.push(text) }
+};
+vm.runInNewContext(componentJs, { exports: componentExports, require: name => modules[name] });
+const scope = vue.effectScope();
+const state = scope.run(() => componentExports.default.setup({}, { expose() {} }));
+assert.equal(state.purpose.value, "OOTD");
+await state.refreshCapabilities();
+assert.equal(requests.at(-1), "OOTD");
+state.generationOptions.value = { providers: [{ provider: "p", model: "m" }], defaultSelection: { provider: "p", model: "m" } };
+for (const purpose of ["OOTD", "BASELINE", "ART_CREATION"]) {
+  state.purpose.value = purpose;
+  await vue.nextTick();
+  assert.equal(requests.at(-1), purpose);
+  state.edit();
+  assert.equal(state.form.value.purpose, purpose);
+  state.form.value.verified = true;
+  state.form.value.notes = " ";
+  const count = saved.length;
+  await state.save();
+  assert.equal(saved.length, count, "verified capabilities require notes");
+  state.form.value.notes = "试做成功";
+  state.optionsText.value = purpose === "ART_CREATION" ? '{"size":"large"}' : "invalid JSON";
+  await state.save();
+  assert.equal(saved.at(-1).purpose, purpose);
+  assert.equal(JSON.stringify(saved.at(-1).outputOptions), purpose === "ART_CREATION" ? '{"size":"large"}' : "{}");
+  state.edit({ provider: "p", model: "m", purpose, maxReferences: 2, verified: false, version: 3, notes: "", outputOptions: { size: "old" } });
+  assert.equal(state.form.value.purpose, purpose);
+  assert.equal(state.form.value.version, 3);
+  state.optionsText.value = purpose === "ART_CREATION" ? '{"size":"new"}' : "invalid JSON";
+  await state.save();
+  assert.equal(saved.at(-1).purpose, purpose);
+  assert.equal(JSON.stringify(saved.at(-1).outputOptions), purpose === "ART_CREATION" ? '{"size":"new"}' : "{}");
+}
+route.query.purpose = "BASELINE";
+await vue.nextTick();
+assert.equal(state.purpose.value, "BASELINE");
+route.query.purpose = "invalid";
+await vue.nextTick();
+assert.equal(state.purpose.value, "ART_CREATION");
+assert.match(capabilitySource, /v-if="purpose === 'ART_CREATION'"\s+label="成本标识"/);
+assert.match(capabilitySource, /v-if="form.purpose === 'ART_CREATION'"\s+label="输出参数/);
+const modelsPage = await readProjectFile("../src/views/integrations/closet/models/index.vue");
+assert.match(modelsPage, /name: 'ClosetCreationCapabilities', query: \{ purpose: 'OOTD' \}/);
+scope.stop();
 console.log(
   "Creation API: 28 operations, static/dynamic navigation, and offline icons verified."
 );

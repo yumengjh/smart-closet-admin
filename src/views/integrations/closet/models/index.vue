@@ -733,6 +733,18 @@ onMounted(() => {
                 :label="capabilityNames[capability]"
                 :name="capability"
             /></el-tabs>
+            <p v-if="tab === 'IMAGE'" class="help">
+              试穿页和创作只会用在“模型能力”里登记过用途的生图模型。新接入的生图模型要先去
+              <router-link
+                :to="{
+                  name: 'ClosetCreationCapabilities',
+                  query: { purpose: 'OOTD' }
+                }"
+              >
+                模型能力
+              </router-link>
+              登记上身图、形象图或创作用途。
+            </p>
             <el-table
               :data="overview.entries.filter(entry => entry.capability === tab)"
             >
