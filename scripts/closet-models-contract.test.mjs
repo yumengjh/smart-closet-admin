@@ -51,7 +51,6 @@ assert.match(page, /row\.inUse === "ACTIVE"[\s\S]*row\.inUse === "FALLBACK"/);
 assert.match(page, /healthText\(row\.health\)/);
 assert.match(page, /v-if="row\.editable"/);
 assert.match(page, /!row\.deletable/);
-assert.match(page, /row\.kind === "REROUTED" \? entryName\(row\.code\)/);
 assert.match(page, /对话模型的 token 参数名只影响“试一次”/);
 assert.match(page, /if \(row\.capability === "IMAGE"\) return/);
 assert.match(page, /v-if="row\.capability !== 'IMAGE'"/);

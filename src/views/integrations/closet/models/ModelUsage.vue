@@ -84,7 +84,8 @@ const costs = (items: UsageCost[]) =>
     : ["—"];
 const duration = (ms: number | null) =>
   ms == null ? "—" : `${Math.round(ms)} ms`;
-const errorHint = (code: string) => {
+const errorHint = (code: string | null) => {
+  if (!code) return "";
   if (/^PROVIDER_HTTP_(401|403)$/.test(code)) return "密钥或权限";
   if (code === "PROVIDER_HTTP_429") return "限流或额度";
   if (/^PROVIDER_HTTP_5\d\d$/.test(code)) return "上游故障";
@@ -381,7 +382,7 @@ onMounted(() => {
           ><el-table-column prop="model" label="模型" min-width="160" />
           <el-table-column label="错误码" min-width="220"
             ><template #default="{ row }"
-              >{{ row.errorCode
+              >{{ row.errorCode ?? "—"
               }}<span
                 v-if="errorHint(row.errorCode)"
                 class="text-xs text-gray-500"
@@ -450,7 +451,8 @@ onMounted(() => {
             }}</template></el-table-column
           ><el-table-column label="Token（输入/输出）" min-width="145"
             ><template #default="{ row }"
-              >{{ row.inputTokens }} / {{ row.outputTokens }}</template
+              >{{ row.inputTokens ?? "—" }} /
+              {{ row.outputTokens ?? "—" }}</template
             ></el-table-column
           ><el-table-column prop="images" label="出图" />
           <el-table-column label="费用" min-width="130"

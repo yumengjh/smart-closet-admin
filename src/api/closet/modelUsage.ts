@@ -19,7 +19,7 @@ export type ModelUsage = {
   totals: UsageCounts & { requests: number; cancelled: number };
   byProvider: (UsageCounts & {
     providerId: string;
-    providerName: string | null;
+    providerName: string;
     lastCallAtMs: number | null;
   })[];
   byModel: (UsageCounts & {
@@ -53,7 +53,7 @@ export type ModelUsage = {
   errors: {
     providerId: string;
     model: string;
-    errorCode: string;
+    errorCode: string | null;
     count: number;
     lastAtMs: number;
   }[];
@@ -65,10 +65,10 @@ export type ModelUsage = {
     purpose: string;
     outcome: string;
     errorCode: string | null;
-    latencyMs: number | null;
+    latencyMs: number;
     requests: number;
-    inputTokens: number;
-    outputTokens: number;
+    inputTokens: number | null;
+    outputTokens: number | null;
     images: number;
     rerouted: boolean;
     costMicro: number | null;
