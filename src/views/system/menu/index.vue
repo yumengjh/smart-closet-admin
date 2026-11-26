@@ -395,6 +395,7 @@ onMounted(async () => {
               label="收费管理 · 利润报表"
               value="closet-billing-margin" />
             <el-option label="运行监控" value="closet-ops" />
+            <el-option label="模型调配" value="closet-models" />
             <el-option label="数据导出" value="closet-exports" />
             <el-option label="模板审核" value="closet-templates" />
             <el-option label="风格词审核" value="closet-style-terms" />

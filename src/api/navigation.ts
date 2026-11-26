@@ -35,6 +35,7 @@ export type NavigationMenu = {
     | "closet-samples"
     | "closet-style-terms"
     | "closet-feedback"
+    | "closet-models"
     | "closet-tryon"
     | "closet-billing-settings"
     | "closet-billing-tiers"

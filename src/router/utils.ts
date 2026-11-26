@@ -61,6 +61,7 @@ export const routeComponentRegistry: Record<
     import("@/views/integrations/closet/style-terms/index.vue"),
   "closet-feedback": () =>
     import("@/views/integrations/closet/feedback/index.vue"),
+  "closet-models": () => import("@/views/integrations/closet/models/index.vue"),
   "closet-billing-settings": () =>
     import("@/views/integrations/closet/billing/Settings.vue"),
   "closet-billing-tiers": () =>
