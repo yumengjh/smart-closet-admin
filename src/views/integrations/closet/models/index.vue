@@ -27,6 +27,7 @@ import {
 } from "@/api/closet/models";
 import ClosetUnavailable from "../ClosetUnavailable.vue";
 import { formatTime, useClosetRequest } from "../useClosetRequest";
+import ModelUsage from "./ModelUsage.vue";
 
 defineOptions({ name: "ClosetModels" });
 const { can } = useCurrentPermissions();
@@ -64,6 +65,7 @@ const routingForms = reactive<
   CHAT: { active: "", fallback: null }
 });
 const tab = ref<Capability>("VISION");
+const pageTab = ref("config");
 const busy = ref(false);
 const load = () =>
   run(getModels, ({ data }) => {
@@ -506,342 +508,368 @@ onMounted(() => {
       :closable="false"
     />
     <template v-if="overview && !unavailable">
-      <el-alert
-        v-if="!overview.masterKeyConfigured"
-        title="未设置 CLOSET_MODEL_MASTER_KEY（或试穿主密钥 CLOSET_TRYON_MASTER_KEY），只能查看和切换部署配置里的模型，不能新增或更换带密钥的服务商。"
-        type="warning"
-        :closable="false"
-        show-icon
-      />
-      <el-alert
-        v-if="!overview.failoverEnabled"
-        title="自动备用已在部署配置中关闭，生效模型失败时不会自动切换。"
-        type="info"
-        :closable="false"
-        show-icon
-      />
-      <el-card>
-        <template #header
-          ><div>
-            <h2 class="text-base">正在使用</h2>
-            <p class="text-xs text-gray-500">
-              新任务立即使用这里选的模型；已经排队的任务继续用提交时的模型。生效模型连续失败
-              3 次会暂停 10
-              分钟，期间新任务和排队中的整理、识图任务改用备用，到期自动试回；上身图和创作不改用备用。
-            </p>
-          </div></template
-        >
-        <div class="routing-grid">
-          <div
-            v-for="capability in capabilities"
-            :key="capability"
-            class="space-y-3"
-          >
-            <h3 class="font-medium">{{ capabilityNames[capability] }}</h3>
-            <p class="text-xs text-gray-500">{{ descriptions[capability] }}</p>
-            <div>
-              生效模型
-              <el-select
-                v-model="routingForms[capability].active"
-                class="w-full"
-                :disabled="!writable"
-                placeholder="请选择"
-                ><el-option
-                  v-for="entry in eligible(capability)"
-                  :key="entry.id"
-                  :value="entry.id"
-                  :label="entryName(entry.id)"
-              /></el-select>
-            </div>
-            <div>
-              备用模型
-              <el-select
-                v-model="routingForms[capability].fallback"
-                class="w-full"
-                :disabled="!writable"
-                clearable
-                placeholder="不设备用"
-                ><el-option
-                  v-for="entry in eligible(capability)"
-                  :key="entry.id"
-                  :value="entry.id"
-                  :label="entryName(entry.id)"
-                  :disabled="entry.id === routingForms[capability].active"
-              /></el-select>
-            </div>
-            <div>
-              实际在用：{{ entryName(overview.routing[capability]?.effective) }}
-              <el-tag
-                v-if="
-                  overview.routing[capability]?.effective &&
-                  overview.routing[capability]?.effective !==
-                    overview.routing[capability]?.active
-                "
-                type="warning"
-                >已切到备用</el-tag
-              >
-            </div>
-            <div>
-              健康：{{
-                healthText(
-                  overview.entries.find(
-                    entry => entry.id === overview.routing[capability]?.active
-                  )?.health
-                )
-              }}
-            </div>
-            <div>
-              <el-button
-                type="primary"
-                :disabled="!writable || busy"
-                @click="saveRouting(capability)"
-                >保存</el-button
-              ><el-button
-                :disabled="
-                  !writable || busy || !overview.routing[capability]?.configured
-                "
-                @click="resetRouting(capability)"
-                >恢复部署默认</el-button
-              >
-            </div>
-          </div>
-        </div>
-      </el-card>
-      <el-card>
-        <template #header
-          ><div class="card-heading">
-            <div>
-              <h2 class="text-base">服务商</h2>
-              <p class="text-xs text-gray-500">
-                一个服务商是一套上游平台的地址和密钥，可以同时给多类能力提供模型。来自部署配置的服务商只能查看。
-              </p>
-            </div>
-            <el-button
-              type="primary"
-              :disabled="!writable"
-              @click="openProvider()"
-              >新增服务商</el-button
+      <el-tabs v-model="pageTab">
+        <el-tab-pane label="配置" name="config" class="space-y-4">
+          <el-alert
+            v-if="!overview.masterKeyConfigured"
+            title="未设置 CLOSET_MODEL_MASTER_KEY（或试穿主密钥 CLOSET_TRYON_MASTER_KEY），只能查看和切换部署配置里的模型，不能新增或更换带密钥的服务商。"
+            type="warning"
+            :closable="false"
+            show-icon
+          />
+          <el-alert
+            v-if="!overview.failoverEnabled"
+            title="自动备用已在部署配置中关闭，生效模型失败时不会自动切换。"
+            type="info"
+            :closable="false"
+            show-icon
+          />
+          <el-card>
+            <template #header
+              ><div>
+                <h2 class="text-base">正在使用</h2>
+                <p class="text-xs text-gray-500">
+                  新任务立即使用这里选的模型；已经排队的任务继续用提交时的模型。生效模型连续失败
+                  3 次会暂停 10
+                  分钟，期间新任务和排队中的整理、识图任务改用备用，到期自动试回；上身图和创作不改用备用。
+                </p>
+              </div></template
             >
-          </div></template
-        >
-        <el-table :data="overview.providers">
-          <el-table-column label="名称" min-width="140"
-            ><template #default="{ row }"
-              >{{ row.name }}
-              <div class="text-xs text-gray-500">{{ row.id }}</div></template
-            ></el-table-column
-          >
-          <el-table-column label="类型" width="120"
-            ><template #default="{ row }">{{
-              row.kind === "GEMINI" ? "Gemini" : "OpenAI 兼容"
-            }}</template></el-table-column
-          >
-          <el-table-column
-            prop="baseUrl"
-            label="地址"
-            min-width="190"
-            show-overflow-tooltip
-          /><el-table-column label="密钥"
-            ><template #default="{ row }">{{
-              row.apiKeyHint || "未配置"
-            }}</template></el-table-column
-          >
-          <el-table-column label="状态" width="130"
-            ><template #default="{ row }">{{
-              statusNames[row.status as keyof typeof statusNames]
-            }}</template></el-table-column
-          >
-          <el-table-column label="来源" width="100"
-            ><template #default="{ row }"
-              ><el-tooltip
-                v-if="row.source === 'CONFIG'"
-                content="来自环境变量或部署配置文件，只能在部署时修改"
-                ><el-tag type="info">部署配置</el-tag></el-tooltip
-              ><el-tag v-else>后台添加</el-tag></template
-            ></el-table-column
-          >
-          <el-table-column label="操作" width="230" fixed="right"
-            ><template #default="{ row }"
-              ><el-button
-                link
-                type="primary"
-                :disabled="!writable"
-                @click="probe(row.id)"
-                >测试连接</el-button
-              ><el-button
-                v-if="row.editable"
-                link
-                type="primary"
-                :disabled="!writable"
-                @click="openProvider(row)"
-                >编辑</el-button
-              ><el-tooltip
-                :content="
-                  row.source === 'CONFIG'
-                    ? '部署配置不能删除'
-                    : '先删除这个服务商下的模型'
-                "
-                :disabled="row.deletable"
-                ><span
+            <div class="routing-grid">
+              <div
+                v-for="capability in capabilities"
+                :key="capability"
+                class="space-y-3"
+              >
+                <h3 class="font-medium">{{ capabilityNames[capability] }}</h3>
+                <p class="text-xs text-gray-500">
+                  {{ descriptions[capability] }}
+                </p>
+                <div>
+                  生效模型
+                  <el-select
+                    v-model="routingForms[capability].active"
+                    class="w-full"
+                    :disabled="!writable"
+                    placeholder="请选择"
+                    ><el-option
+                      v-for="entry in eligible(capability)"
+                      :key="entry.id"
+                      :value="entry.id"
+                      :label="entryName(entry.id)"
+                  /></el-select>
+                </div>
+                <div>
+                  备用模型
+                  <el-select
+                    v-model="routingForms[capability].fallback"
+                    class="w-full"
+                    :disabled="!writable"
+                    clearable
+                    placeholder="不设备用"
+                    ><el-option
+                      v-for="entry in eligible(capability)"
+                      :key="entry.id"
+                      :value="entry.id"
+                      :label="entryName(entry.id)"
+                      :disabled="entry.id === routingForms[capability].active"
+                  /></el-select>
+                </div>
+                <div>
+                  实际在用：{{
+                    entryName(overview.routing[capability]?.effective)
+                  }}
+                  <el-tag
+                    v-if="
+                      overview.routing[capability]?.effective &&
+                      overview.routing[capability]?.effective !==
+                        overview.routing[capability]?.active
+                    "
+                    type="warning"
+                    >已切到备用</el-tag
+                  >
+                </div>
+                <div>
+                  健康：{{
+                    healthText(
+                      overview.entries.find(
+                        entry =>
+                          entry.id === overview.routing[capability]?.active
+                      )?.health
+                    )
+                  }}
+                </div>
+                <div>
+                  <el-button
+                    type="primary"
+                    :disabled="!writable || busy"
+                    @click="saveRouting(capability)"
+                    >保存</el-button
+                  ><el-button
+                    :disabled="
+                      !writable ||
+                      busy ||
+                      !overview.routing[capability]?.configured
+                    "
+                    @click="resetRouting(capability)"
+                    >恢复部署默认</el-button
+                  >
+                </div>
+              </div>
+            </div>
+          </el-card>
+          <el-card>
+            <template #header
+              ><div class="card-heading">
+                <div>
+                  <h2 class="text-base">服务商</h2>
+                  <p class="text-xs text-gray-500">
+                    一个服务商是一套上游平台的地址和密钥，可以同时给多类能力提供模型。来自部署配置的服务商只能查看。
+                  </p>
+                </div>
+                <el-button
+                  type="primary"
+                  :disabled="!writable"
+                  @click="openProvider()"
+                  >新增服务商</el-button
+                >
+              </div></template
+            >
+            <el-table :data="overview.providers">
+              <el-table-column label="名称" min-width="140"
+                ><template #default="{ row }"
+                  >{{ row.name }}
+                  <div class="text-xs text-gray-500">
+                    {{ row.id }}
+                  </div></template
+                ></el-table-column
+              >
+              <el-table-column label="类型" width="120"
+                ><template #default="{ row }">{{
+                  row.kind === "GEMINI" ? "Gemini" : "OpenAI 兼容"
+                }}</template></el-table-column
+              >
+              <el-table-column
+                prop="baseUrl"
+                label="地址"
+                min-width="190"
+                show-overflow-tooltip
+              /><el-table-column label="密钥"
+                ><template #default="{ row }">{{
+                  row.apiKeyHint || "未配置"
+                }}</template></el-table-column
+              >
+              <el-table-column label="状态" width="130"
+                ><template #default="{ row }">{{
+                  statusNames[row.status as keyof typeof statusNames]
+                }}</template></el-table-column
+              >
+              <el-table-column label="来源" width="100"
+                ><template #default="{ row }"
+                  ><el-tooltip
+                    v-if="row.source === 'CONFIG'"
+                    content="来自环境变量或部署配置文件，只能在部署时修改"
+                    ><el-tag type="info">部署配置</el-tag></el-tooltip
+                  ><el-tag v-else>后台添加</el-tag></template
+                ></el-table-column
+              >
+              <el-table-column label="操作" width="230" fixed="right"
+                ><template #default="{ row }"
                   ><el-button
                     link
-                    type="danger"
-                    :disabled="!writable || !row.deletable"
-                    @click="removeProvider(row)"
-                    >删除</el-button
-                  ></span
-                ></el-tooltip
-              ></template
-            ></el-table-column
-          >
-        </el-table>
-      </el-card>
-      <el-card>
-        <template #header
-          ><div class="card-heading">
-            <div>
-              <h2 class="text-base">模型</h2>
-              <p class="text-xs text-gray-500">
-                每个模型属于一个服务商和一类能力。关闭的模型不能被选为生效或备用；对话里开启的模型会出现在用户的助手模型列表中。
-              </p>
-            </div>
-            <el-button type="primary" :disabled="!writable" @click="openEntry()"
-              >新增模型</el-button
-            >
-          </div></template
-        >
-        <el-tabs v-model="tab"
-          ><el-tab-pane
-            v-for="capability in capabilities"
-            :key="capability"
-            :label="capabilityNames[capability]"
-            :name="capability"
-        /></el-tabs>
-        <el-table
-          :data="overview.entries.filter(entry => entry.capability === tab)"
-        >
-          <el-table-column label="名称" min-width="150"
-            ><template #default="{ row }"
-              >{{ row.label || row.model }}
-              <div class="text-xs text-gray-500">{{ row.model }}</div></template
-            ></el-table-column
-          >
-          <el-table-column label="服务商"
-            ><template #default="{ row }">{{
-              providerName(row.providerId)
-            }}</template></el-table-column
-          ><el-table-column prop="protocol" label="协议" min-width="140" />
-          <el-table-column label="关键参数" min-width="210"
-            ><template #default="{ row }">{{
-              keyParameters(row)
-            }}</template></el-table-column
-          >
-          <el-table-column label="路由" width="90"
-            ><template #default="{ row }">{{
-              row.inUse === "ACTIVE"
-                ? "生效"
-                : row.inUse === "FALLBACK"
-                  ? "备用"
-                  : "—"
-            }}</template></el-table-column
-          >
-          <el-table-column label="开启" width="75"
-            ><template #default="{ row }"
-              ><el-switch
-                :model-value="row.enabled"
-                :disabled="!writable || !row.editable || busy"
-                @change="toggleEntry(row, $event)" /></template
-          ></el-table-column>
-          <el-table-column label="健康" min-width="150"
-            ><template #default="{ row }">{{
-              healthText(row.health)
-            }}</template></el-table-column
-          >
-          <el-table-column label="来源" width="100"
-            ><template #default="{ row }"
-              ><el-tag :type="row.source === 'CONFIG' ? 'info' : 'primary'">{{
-                row.source === "CONFIG" ? "部署配置" : "后台添加"
-              }}</el-tag></template
-            ></el-table-column
-          >
-          <el-table-column label="操作" width="210" fixed="right"
-            ><template #default="{ row }"
-              ><el-button
-                v-if="row.capability !== 'IMAGE'"
-                link
-                type="primary"
-                :disabled="!writable"
-                @click="tryEntry(row)"
-                >试一次</el-button
-              ><el-button
-                v-if="row.health.state === 'PAUSED'"
-                link
-                type="primary"
-                :disabled="!writable"
-                @click="mutate(() => resumeEntry(row.id), '已恢复')"
-                >恢复</el-button
-              ><el-button
-                v-if="row.editable"
-                link
-                type="primary"
-                :disabled="!writable"
-                @click="openEntry(row)"
-                >编辑</el-button
-              ><el-tooltip
-                :content="
-                  row.source === 'CONFIG'
-                    ? '部署配置不能删除'
-                    : '正在被选为生效或备用的模型不能删除'
-                "
-                :disabled="row.deletable"
-                ><span
+                    type="primary"
+                    :disabled="!writable"
+                    @click="probe(row.id)"
+                    >测试连接</el-button
                   ><el-button
+                    v-if="row.editable"
                     link
-                    type="danger"
-                    :disabled="!writable || !row.deletable"
-                    @click="removeEntry(row)"
-                    >删除</el-button
-                  ></span
-                ></el-tooltip
-              ></template
-            ></el-table-column
-          >
-        </el-table>
-      </el-card>
-      <el-card>
-        <template #header
-          ><div>
-            <h2 class="text-base">最近切换记录</h2>
-            <p class="text-xs text-gray-500">
-              自动暂停、恢复和执行前改道的记录，只保留进程内最近 20
-              条，重启后清空。
-            </p>
-          </div></template
-        >
-        <el-table :data="overview.events"
-          ><el-table-column label="时间" min-width="160"
-            ><template #default="{ row }">{{
-              formatTime(row.atMs)
-            }}</template></el-table-column
-          ><el-table-column label="能力"
-            ><template #default="{ row }">{{
-              capabilityNames[row.capability as Capability]
-            }}</template></el-table-column
-          ><el-table-column label="模型" min-width="180"
-            ><template #default="{ row }">{{
-              entryName(row.entryId)
-            }}</template></el-table-column
-          ><el-table-column label="事件"
-            ><template #default="{ row }">{{
-              eventNames[row.kind as keyof typeof eventNames]
-            }}</template></el-table-column
-          ><el-table-column label="原因 / 改用模型" min-width="180"
-            ><template #default="{ row }">{{
-              row.kind === "REROUTED" ? entryName(row.code) : row.code || "—"
-            }}</template></el-table-column
-          >
-        </el-table>
-      </el-card>
+                    type="primary"
+                    :disabled="!writable"
+                    @click="openProvider(row)"
+                    >编辑</el-button
+                  ><el-tooltip
+                    :content="
+                      row.source === 'CONFIG'
+                        ? '部署配置不能删除'
+                        : '先删除这个服务商下的模型'
+                    "
+                    :disabled="row.deletable"
+                    ><span
+                      ><el-button
+                        link
+                        type="danger"
+                        :disabled="!writable || !row.deletable"
+                        @click="removeProvider(row)"
+                        >删除</el-button
+                      ></span
+                    ></el-tooltip
+                  ></template
+                ></el-table-column
+              >
+            </el-table>
+          </el-card>
+          <el-card>
+            <template #header
+              ><div class="card-heading">
+                <div>
+                  <h2 class="text-base">模型</h2>
+                  <p class="text-xs text-gray-500">
+                    每个模型属于一个服务商和一类能力。关闭的模型不能被选为生效或备用；对话里开启的模型会出现在用户的助手模型列表中。
+                  </p>
+                </div>
+                <el-button
+                  type="primary"
+                  :disabled="!writable"
+                  @click="openEntry()"
+                  >新增模型</el-button
+                >
+              </div></template
+            >
+            <el-tabs v-model="tab"
+              ><el-tab-pane
+                v-for="capability in capabilities"
+                :key="capability"
+                :label="capabilityNames[capability]"
+                :name="capability"
+            /></el-tabs>
+            <el-table
+              :data="overview.entries.filter(entry => entry.capability === tab)"
+            >
+              <el-table-column label="名称" min-width="150"
+                ><template #default="{ row }"
+                  >{{ row.label || row.model }}
+                  <div class="text-xs text-gray-500">
+                    {{ row.model }}
+                  </div></template
+                ></el-table-column
+              >
+              <el-table-column label="服务商"
+                ><template #default="{ row }">{{
+                  providerName(row.providerId)
+                }}</template></el-table-column
+              ><el-table-column prop="protocol" label="协议" min-width="140" />
+              <el-table-column label="关键参数" min-width="210"
+                ><template #default="{ row }">{{
+                  keyParameters(row)
+                }}</template></el-table-column
+              >
+              <el-table-column label="路由" width="90"
+                ><template #default="{ row }">{{
+                  row.inUse === "ACTIVE"
+                    ? "生效"
+                    : row.inUse === "FALLBACK"
+                      ? "备用"
+                      : "—"
+                }}</template></el-table-column
+              >
+              <el-table-column label="开启" width="75"
+                ><template #default="{ row }"
+                  ><el-switch
+                    :model-value="row.enabled"
+                    :disabled="!writable || !row.editable || busy"
+                    @change="toggleEntry(row, $event)" /></template
+              ></el-table-column>
+              <el-table-column label="健康" min-width="150"
+                ><template #default="{ row }">{{
+                  healthText(row.health)
+                }}</template></el-table-column
+              >
+              <el-table-column label="来源" width="100"
+                ><template #default="{ row }"
+                  ><el-tag
+                    :type="row.source === 'CONFIG' ? 'info' : 'primary'"
+                    >{{
+                      row.source === "CONFIG" ? "部署配置" : "后台添加"
+                    }}</el-tag
+                  ></template
+                ></el-table-column
+              >
+              <el-table-column label="操作" width="210" fixed="right"
+                ><template #default="{ row }"
+                  ><el-button
+                    v-if="row.capability !== 'IMAGE'"
+                    link
+                    type="primary"
+                    :disabled="!writable"
+                    @click="tryEntry(row)"
+                    >试一次</el-button
+                  ><el-button
+                    v-if="row.health.state === 'PAUSED'"
+                    link
+                    type="primary"
+                    :disabled="!writable"
+                    @click="mutate(() => resumeEntry(row.id), '已恢复')"
+                    >恢复</el-button
+                  ><el-button
+                    v-if="row.editable"
+                    link
+                    type="primary"
+                    :disabled="!writable"
+                    @click="openEntry(row)"
+                    >编辑</el-button
+                  ><el-tooltip
+                    :content="
+                      row.source === 'CONFIG'
+                        ? '部署配置不能删除'
+                        : '正在被选为生效或备用的模型不能删除'
+                    "
+                    :disabled="row.deletable"
+                    ><span
+                      ><el-button
+                        link
+                        type="danger"
+                        :disabled="!writable || !row.deletable"
+                        @click="removeEntry(row)"
+                        >删除</el-button
+                      ></span
+                    ></el-tooltip
+                  ></template
+                ></el-table-column
+              >
+            </el-table>
+          </el-card>
+          <el-card>
+            <template #header
+              ><div>
+                <h2 class="text-base">最近切换记录</h2>
+                <p class="text-xs text-gray-500">
+                  自动暂停、恢复和执行前改道的记录，只保留进程内最近 20
+                  条，重启后清空。
+                </p>
+              </div></template
+            >
+            <el-table :data="overview.events"
+              ><el-table-column label="时间" min-width="160"
+                ><template #default="{ row }">{{
+                  formatTime(row.atMs)
+                }}</template></el-table-column
+              ><el-table-column label="能力"
+                ><template #default="{ row }">{{
+                  capabilityNames[row.capability as Capability]
+                }}</template></el-table-column
+              ><el-table-column label="模型" min-width="180"
+                ><template #default="{ row }">{{
+                  entryName(row.entryId)
+                }}</template></el-table-column
+              ><el-table-column label="事件"
+                ><template #default="{ row }">{{
+                  eventNames[row.kind as keyof typeof eventNames]
+                }}</template></el-table-column
+              ><el-table-column label="原因 / 改用模型" min-width="180"
+                ><template #default="{ row }">{{
+                  row.kind === "REROUTED"
+                    ? entryName(row.code)
+                    : row.code || "—"
+                }}</template></el-table-column
+              >
+            </el-table>
+          </el-card>
+        </el-tab-pane>
+        <el-tab-pane label="调用与消耗" name="usage" lazy>
+          <ModelUsage :providers="overview.providers" />
+        </el-tab-pane>
+      </el-tabs>
     </template>
     <el-dialog
       v-model="providerOpen"
