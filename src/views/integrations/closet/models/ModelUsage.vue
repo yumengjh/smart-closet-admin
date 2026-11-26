@@ -246,7 +246,7 @@ onMounted(() => {
       <el-card>
         <template #header
           ><div>
-            <h2>按服务商</h2>
+            <h2 class="text-base">按服务商</h2>
             <p class="text-xs text-gray-500">同一个服务商下所有模型的合计</p>
           </div></template
         >
@@ -288,7 +288,7 @@ onMounted(() => {
       <el-card>
         <template #header
           ><div>
-            <h2>按模型</h2>
+            <h2 class="text-base">按模型</h2>
             <p class="text-xs text-gray-500">
               一行是一个服务商的一个模型；改用备用的调用单独计数
             </p>
@@ -355,7 +355,7 @@ onMounted(() => {
       <el-card>
         <template #header
           ><div>
-            <h2>每日趋势</h2>
+            <h2 class="text-base">每日趋势</h2>
             <p class="text-xs text-gray-500">按北京时间分日</p>
           </div></template
         >
@@ -368,7 +368,7 @@ onMounted(() => {
       <el-card>
         <template #header
           ><div>
-            <h2>错误排行</h2>
+            <h2 class="text-base">错误排行</h2>
             <p class="text-xs text-gray-500">
               失败最多的错误码，帮助判断是密钥、额度还是上游故障
             </p>
@@ -402,7 +402,7 @@ onMounted(() => {
       <el-card>
         <template #header
           ><div>
-            <h2>最近调用</h2>
+            <h2 class="text-base">最近调用</h2>
             <p class="text-xs text-gray-500">最近 50 次，不含提示词和图片</p>
           </div></template
         >
