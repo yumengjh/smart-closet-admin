@@ -345,6 +345,11 @@ onMounted(() => {
             label="改用备用"
             min-width="90"
           />
+          <el-table-column
+            prop="stitchedCalls"
+            label="拼图次数"
+            min-width="90"
+          />
           <el-table-column label="最近调用" min-width="170"
             ><template #default="{ row }">{{
               formatTime(row.lastCallAtMs)
@@ -442,6 +447,8 @@ onMounted(() => {
               }}
               <el-tag v-if="row.rerouted" size="small" type="warning"
                 >备用</el-tag
+              ><el-tag v-if="row.stitched > 0" size="small" type="info"
+                >拼图 {{ row.stitched }} 张</el-tag
               ></template
             ></el-table-column
           >

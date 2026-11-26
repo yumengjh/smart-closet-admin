@@ -14,6 +14,7 @@ import {
   editProvider,
   getModels,
   probeProvider,
+  putEntryReferences,
   putRouting,
   resumeEntry,
   testEntry,
@@ -23,7 +24,8 @@ import {
   type ModelOverview,
   type ModelProtocol,
   type ModelProvider,
-  type ProviderKind
+  type ProviderKind,
+  type ReferenceOverLimit
 } from "@/api/closet/models";
 import ClosetUnavailable from "../ClosetUnavailable.vue";
 import { formatTime, useClosetRequest } from "../useClosetRequest";
@@ -121,6 +123,7 @@ const fail = (error: unknown, fallback: string) => {
     message("这条记录刚被改过，已重新加载，请再改一次。", { type: "warning" });
     providerOpen.value = false;
     entryOpen.value = false;
+    referencesOpen.value = false;
     void load();
   } else message(response?.data?.message || fallback, { type: "error" });
 };
@@ -225,6 +228,34 @@ const toggleEntry = async (
   await mutate(() =>
     editEntry(row.id, { enabled: Boolean(value), revision: row.revision })
   );
+};
+
+const referencesOpen = ref(false);
+const referencesCurrent = ref<ModelEntry>();
+const referencesForm = reactive<{
+  maxReferenceImages: number | undefined;
+  overLimit: ReferenceOverLimit;
+}>({ maxReferenceImages: undefined, overLimit: "STITCH" });
+const openReferences = (row: ModelEntry) => {
+  if (!row.references) return;
+  referencesCurrent.value = row;
+  referencesForm.maxReferenceImages = row.references.customLimit ?? undefined;
+  referencesForm.overLimit = row.references.overLimit;
+  referencesOpen.value = true;
+};
+const saveReferences = async () => {
+  const current = referencesCurrent.value;
+  if (!current?.references) return;
+  if (
+    await mutate(() =>
+      putEntryReferences(current.id, {
+        maxReferenceImages: referencesForm.maxReferenceImages ?? null,
+        overLimit: referencesForm.overLimit,
+        revision: current.references!.revision
+      })
+    )
+  )
+    referencesOpen.value = false;
 };
 
 const providerOpen = ref(false);
@@ -350,7 +381,8 @@ const entryForm = reactive<{
   tokenParam: string;
   reasoningEffort: string;
   extraParams: string;
-  maxReferenceImages: number;
+  maxReferenceImages: number | undefined;
+  overLimit: ReferenceOverLimit;
   defaults: string;
 }>({
   capability: "VISION",
@@ -365,7 +397,8 @@ const entryForm = reactive<{
   tokenParam: "max_completion_tokens",
   reasoningEffort: "",
   extraParams: "",
-  maxReferenceImages: 3,
+  maxReferenceImages: undefined,
+  overLimit: "STITCH",
   defaults: ""
 });
 const protocols = computed<ModelProtocol[]>(() => {
@@ -407,7 +440,8 @@ const openEntry = (row?: ModelEntry) => {
     extraParams: options.extraParams
       ? JSON.stringify(options.extraParams, null, 2)
       : "",
-    maxReferenceImages: options.maxReferenceImages ?? 3,
+    maxReferenceImages: options.maxReferenceImages ?? undefined,
+    overLimit: options.overLimit ?? "STITCH",
     defaults: options.defaults ? JSON.stringify(options.defaults, null, 2) : ""
   });
   if (!row) updateProtocol();
@@ -454,8 +488,10 @@ const saveEntry = async () => {
     else delete options.extraParams;
   }
   if (entryForm.capability === "IMAGE") {
-    if (entryForm.protocol === "DASHSCOPE_IMAGE")
+    if (entryForm.maxReferenceImages != null)
       options.maxReferenceImages = entryForm.maxReferenceImages;
+    else delete options.maxReferenceImages;
+    options.overLimit = entryForm.overLimit;
     if (defaults) options.defaults = defaults;
     else delete options.defaults;
   }
@@ -484,7 +520,7 @@ const saveEntry = async () => {
 const keyParameters = (row: ModelEntry) => {
   const options = row.options;
   if (row.capability === "IMAGE")
-    return `参考图上限：${options.maxReferenceImages ?? "—"} · 尺寸：${(options.defaults as Record<string, unknown> | undefined)?.size ?? "—"}`;
+    return `尺寸：${(options.defaults as Record<string, unknown> | undefined)?.size ?? "—"}`;
   return `${row.capability === "VISION" ? `输出：${options.structuredOutput ?? "JSON_SCHEMA"} · ` : ""}reasoning：${options.reasoningEffort ?? "不发送"}`;
 };
 onMounted(() => {
@@ -734,16 +770,15 @@ onMounted(() => {
                 :name="capability"
             /></el-tabs>
             <p v-if="tab === 'IMAGE'" class="help">
-              试穿页和创作只会用在“模型能力”里登记过用途的生图模型。新接入的生图模型要先去
+              设了生图路由后，生图模型自动用于上身图、形象图和创作；参考图超过上限时按每个模型的“参考图设置”处理。
               <router-link
                 :to="{
                   name: 'ClosetCreationCapabilities',
                   query: { purpose: 'OOTD' }
                 }"
               >
-                模型能力
+                模型能力（只在没设生图路由时使用）
               </router-link>
-              登记上身图、形象图或创作用途。
             </p>
             <el-table
               :data="overview.entries.filter(entry => entry.capability === tab)"
@@ -766,6 +801,24 @@ onMounted(() => {
                   keyParameters(row)
                 }}</template></el-table-column
               >
+              <el-table-column
+                v-if="tab === 'IMAGE'"
+                label="参考图"
+                min-width="210"
+              >
+                <template #default="{ row }">
+                  <template v-if="row.references">
+                    最多 {{ row.references.limit }} 张<span
+                      v-if="row.references.customLimit == null"
+                      class="text-gray-500"
+                      >（默认）</span
+                    >
+                    · 超出{{
+                      row.references.overLimit === "STITCH" ? "拼图" : "报错"
+                    }}
+                  </template>
+                </template>
+              </el-table-column>
               <el-table-column label="路由" width="90"
                 ><template #default="{ row }">{{
                   row.inUse === "ACTIVE"
@@ -799,6 +852,13 @@ onMounted(() => {
               >
               <el-table-column label="操作" width="210" fixed="right"
                 ><template #default="{ row }"
+                  ><el-button
+                    v-if="row.capability === 'IMAGE'"
+                    link
+                    type="primary"
+                    :disabled="!writable || busy || !row.references"
+                    @click="openReferences(row)"
+                    >参考图设置</el-button
                   ><el-button
                     v-if="row.capability !== 'IMAGE'"
                     link
@@ -1079,17 +1139,26 @@ onMounted(() => {
           /></el-form-item>
         </template>
         <template v-if="entryForm.capability === 'IMAGE'"
-          ><el-form-item
-            v-if="entryForm.protocol === 'DASHSCOPE_IMAGE'"
-            label="参考图上限"
+          ><el-form-item label="参考图上限"
             ><el-input-number
               v-model="entryForm.maxReferenceImages"
               :min="1"
-              :max="10"
+              :max="20"
+              :step="1"
+              step-strictly
+              placeholder="使用协议默认值"
             />
             <p class="help">
-              上身图会带多件衣物，建议选 2.1 系列并填 10。
+              按服务商文档填写。例如百炼 Qwen-Image 3.0 是 3 张，2.1 是 10 张。
             </p></el-form-item
+          ><el-form-item label="超出时">
+            <el-radio-group v-model="entryForm.overLimit">
+              <el-radio value="STITCH">拼成一张编号拼图再传（推荐）</el-radio>
+              <el-radio value="REJECT">直接报错，不生成</el-radio>
+            </el-radio-group>
+            <p class="help">
+              拼图会把多出来的衣物缩小放进一张图，单件细节会变弱；上限够用时不会拼。
+            </p> </el-form-item
           ><el-form-item label="默认参数"
             ><el-input
               v-model="entryForm.defaults"
@@ -1106,6 +1175,42 @@ onMounted(() => {
           >保存</el-button
         ></template
       >
+    </el-dialog>
+    <el-dialog
+      v-model="referencesOpen"
+      title="参考图设置"
+      width="min(600px, 95vw)"
+    >
+      <el-form label-position="top">
+        <el-form-item label="单次最多参考图">
+          <el-input-number
+            v-model="referencesForm.maxReferenceImages"
+            :min="1"
+            :max="20"
+            :step="1"
+            step-strictly
+            :placeholder="`默认 ${referencesCurrent?.references?.defaultLimit} 张`"
+          />
+          <p class="help">
+            按服务商文档填写。例如百炼 Qwen-Image 3.0 是 3 张，2.1 是 10 张。
+          </p>
+        </el-form-item>
+        <el-form-item label="超出时">
+          <el-radio-group v-model="referencesForm.overLimit">
+            <el-radio value="STITCH">拼成一张编号拼图再传（推荐）</el-radio>
+            <el-radio value="REJECT">直接报错，不生成</el-radio>
+          </el-radio-group>
+          <p class="help">
+            拼图会把多出来的衣物缩小放进一张图，单件细节会变弱；上限够用时不会拼。
+          </p>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="referencesOpen = false">取消</el-button>
+        <el-button type="primary" :loading="busy" @click="saveReferences"
+          >保存</el-button
+        >
+      </template>
     </el-dialog>
   </div>
 </template>

@@ -225,6 +225,11 @@ onMounted(() => {
   <section class="creation-page">
     <h1>模型高级设置</h1>
     <p class="caption">人工记录模型能力与验证结论；此操作不会调用模型。</p>
+    <el-alert type="info" :closable="false" show-icon>
+      设了生图路由后，这里的用途登记基本不再需要，生图模型自动可用。参考图上限在
+      <router-link to="/closet/models">模型调配</router-link>
+      → 生图模型 → 参考图设置 里改。
+    </el-alert>
     <el-tabs v-model="purpose">
       <el-tab-pane label="创作" name="ART_CREATION" />
       <el-tab-pane label="上身图" name="OOTD" />

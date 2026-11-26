@@ -407,7 +407,11 @@ onMounted(() => void load());
               label="24h 失败" /></el-table
         ></el-card>
         <el-card shadow="never"
-          ><template #header>本地模型与服务商</template
+          ><template #header>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <span>本地模型与服务商</span>
+              <router-link to="/closet/models">去模型调配</router-link>
+            </div></template
           ><el-collapse
             ><el-collapse-item
               v-for="[name, value] in Object.entries({

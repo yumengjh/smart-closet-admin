@@ -307,8 +307,11 @@ await vue.nextTick();
 assert.equal(state.purpose.value, "ART_CREATION");
 assert.match(capabilitySource, /v-if="purpose === 'ART_CREATION'"\s+label="成本标识"/);
 assert.match(capabilitySource, /v-if="form.purpose === 'ART_CREATION'"\s+label="输出参数/);
+assert.match(capabilitySource, /<el-alert type="info"[^>]*>[\s\S]*?设了生图路由后[\s\S]*?<router-link to="\/closet\/models">模型调配<\/router-link>[\s\S]*?参考图设置[\s\S]*?<\/el-alert>/);
+const opsPage = await readProjectFile("../src/views/integrations/closet/ops/index.vue");
+assert.match(opsPage, /本地模型与服务商[\s\S]*?<router-link to="\/closet\/models">去模型调配<\/router-link>/);
 const modelsPage = await readProjectFile("../src/views/integrations/closet/models/index.vue");
-assert.match(modelsPage, /name: 'ClosetCreationCapabilities', query: \{ purpose: 'OOTD' \}/);
+assert.match(modelsPage, /name: 'ClosetCreationCapabilities',\s*query: \{ purpose: 'OOTD' \}/);
 scope.stop();
 console.log(
   "Creation API: 28 operations, static/dynamic navigation, and offline icons verified."

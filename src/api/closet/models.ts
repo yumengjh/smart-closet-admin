@@ -9,6 +9,14 @@ export type ModelProtocol =
   | "GEMINI"
   | "DASHSCOPE_IMAGE";
 export type ModelSource = "CONFIG" | "DATABASE";
+export type ReferenceOverLimit = "STITCH" | "REJECT";
+export type ModelReferences = {
+  limit: number;
+  defaultLimit: number;
+  customLimit: number | null;
+  overLimit: ReferenceOverLimit;
+  revision: number;
+};
 export type ModelHealth = {
   state: "OK" | "PAUSED";
   consecutiveFailures: number;
@@ -47,6 +55,7 @@ export type ModelEntry = {
   inUse: "ACTIVE" | "FALLBACK" | null;
   deletable: boolean;
   editable: boolean;
+  references?: ModelReferences;
   health: ModelHealth;
 };
 export type ModelRouting = {
@@ -140,6 +149,19 @@ export const editEntry = (
   http.request<ApiResponse<ModelEntry>>(
     "patch",
     `${root}/entries/${part(id)}`,
+    { data }
+  );
+export const putEntryReferences = (
+  id: string,
+  data: {
+    maxReferenceImages: number | null;
+    overLimit: ReferenceOverLimit | null;
+    revision: number;
+  }
+) =>
+  http.request<ApiResponse<ModelEntry>>(
+    "put",
+    `${root}/entries/${part(id)}/references`,
     { data }
   );
 export const deleteEntry = (id: string) =>

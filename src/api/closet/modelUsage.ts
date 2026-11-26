@@ -33,6 +33,7 @@ export type ModelUsage = {
     avgLatencyMs: number | null;
     p95LatencyMs: number | null;
     reroutedCalls: number;
+    stitchedCalls: number;
     lastCallAtMs: number | null;
   })[];
   byPurpose: {
@@ -71,6 +72,7 @@ export type ModelUsage = {
     outputTokens: number | null;
     images: number;
     rerouted: boolean;
+    stitched: number;
     costMicro: number | null;
     costCurrency: string | null;
   }[];

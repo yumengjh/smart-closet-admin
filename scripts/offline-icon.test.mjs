@@ -46,6 +46,12 @@ assert.match(
   ),
   /data-test="vue-icon"/
 );
+const registry = await readFile(
+  new URL("../src/components/ReIcon/src/offlineIcon.ts", import.meta.url),
+  "utf8"
+);
+assert.match(registry, /import RiRobot2Line from "~icons\/ri\/robot-2-line\?raw"/);
+assert.match(registry, /\["ri\/robot-2-line", RiRobot2Line\]/);
 console.log(
   "Offline named, data and Vue component icons render without network access"
 );

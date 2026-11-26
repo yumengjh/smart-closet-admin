@@ -7,6 +7,7 @@ import EpHomeFilled from "~icons/ep/home-filled?raw";
 
 // https://icon-sets.iconify.design/ri/?keyword=ri
 import RiSettings3Line from "~icons/ri/settings-3-line?raw";
+import RiRobot2Line from "~icons/ri/robot-2-line?raw";
 import RiImageLine from "~icons/ri/image-line?raw";
 import RiImageAddLine from "~icons/ri/image-add-line?raw";
 import RiImageEditLine from "~icons/ri/image-edit-line?raw";
@@ -47,6 +48,7 @@ const icons = [
   ["ep/home-filled", EpHomeFilled],
   // Remix Icon: https://github.com/Remix-Design/RemixIcon
   ["ri/settings-3-line", RiSettings3Line],
+  ["ri/robot-2-line", RiRobot2Line],
   ["ri/image-line", RiImageLine],
   ["ri/image-add-line", RiImageAddLine],
   ["ri/image-edit-line", RiImageEditLine],
