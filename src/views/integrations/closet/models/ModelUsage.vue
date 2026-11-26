@@ -84,13 +84,19 @@ const costs = (items: UsageCost[]) =>
     : ["—"];
 const duration = (ms: number | null) =>
   ms == null ? "—" : `${Math.round(ms)} ms`;
+const durationSeconds = (ms: number | null) =>
+  ms == null ? "—" : `${(ms / 1000).toFixed(1)} 秒`;
+const nearTimeout = (ms: number | null, timeoutSeconds: number | null) =>
+  ms != null && timeoutSeconds != null && ms >= timeoutSeconds * 800;
+const timeoutResult = (timeoutSeconds: number | null) =>
+  timeoutSeconds == null ? "超时" : `超时（等满 ${timeoutSeconds} 秒）`;
 const errorHint = (code: string | null) => {
   if (!code) return "";
   if (/^PROVIDER_HTTP_(401|403)$/.test(code)) return "密钥或权限";
   if (code === "PROVIDER_HTTP_429") return "限流或额度";
   if (/^PROVIDER_HTTP_5\d\d$/.test(code)) return "上游故障";
-  if (code === "PROVIDER_TIMEOUT" || code === "PROVIDER_CONNECT_TIMEOUT")
-    return "超时";
+  if (code === "PROVIDER_TIMEOUT") return "超时：等满了等待上限还没返回";
+  if (code === "PROVIDER_CONNECT_TIMEOUT") return "超时";
   if (code === "PROVIDER_CONNECTION_FAILED") return "连接失败";
   return "";
 };
@@ -320,10 +326,28 @@ onMounted(() => {
             ><template #default="{ row }">{{
               duration(row.avgLatencyMs)
             }}</template></el-table-column
-          ><el-table-column label="P95 耗时" min-width="100"
-            ><template #default="{ row }">{{
-              duration(row.p95LatencyMs)
-            }}</template></el-table-column
+          ><el-table-column label="P95 耗时" min-width="190"
+            ><template #default="{ row }">
+              <el-tooltip
+                :disabled="!nearTimeout(row.p95LatencyMs, row.timeoutSeconds)"
+                content="接近超时上限，建议调大该模型的等待上限，或换更快的模型。"
+                placement="top"
+              >
+                <span
+                  :class="{
+                    'timeout-warning': nearTimeout(
+                      row.p95LatencyMs,
+                      row.timeoutSeconds
+                    )
+                  }"
+                >
+                  {{ durationSeconds(row.p95LatencyMs)
+                  }}<template v-if="row.timeoutSeconds != null">
+                    / 上限 {{ row.timeoutSeconds }} 秒</template
+                  >
+                </span>
+              </el-tooltip>
+            </template></el-table-column
           >
           <el-table-column label="Token（输入/输出）" min-width="150"
             ><template #default="{ row }"
@@ -437,13 +461,15 @@ onMounted(() => {
           <el-table-column label="结果" min-width="160"
             ><template #default="{ row }"
               >{{
-                row.outcome === "OK"
-                  ? "成功"
-                  : row.outcome === "FAILED"
-                    ? `失败${row.errorCode ? `（${row.errorCode}）` : ""}`
-                    : row.outcome === "CANCELLED"
-                      ? "用户中止"
-                      : row.outcome
+                row.errorCode === "PROVIDER_TIMEOUT"
+                  ? timeoutResult(row.timeoutSeconds)
+                  : row.outcome === "OK"
+                    ? "成功"
+                    : row.outcome === "FAILED"
+                      ? `失败${row.errorCode ? `（${row.errorCode}）` : ""}`
+                      : row.outcome === "CANCELLED"
+                        ? "用户中止"
+                        : row.outcome
               }}
               <el-tag v-if="row.rerouted" size="small" type="warning"
                 >备用</el-tag
@@ -454,7 +480,7 @@ onMounted(() => {
           >
           <el-table-column label="耗时" min-width="90"
             ><template #default="{ row }">{{
-              duration(row.latencyMs)
+              durationSeconds(row.latencyMs)
             }}</template></el-table-column
           ><el-table-column label="Token（输入/输出）" min-width="145"
             ><template #default="{ row }"
@@ -507,6 +533,10 @@ onMounted(() => {
 
 .danger {
   color: var(--el-color-danger);
+}
+
+.timeout-warning {
+  color: var(--el-color-warning);
 }
 
 @media (width <= 1200px) {

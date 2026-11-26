@@ -32,6 +32,7 @@ export type ModelUsage = {
     cancelled: number;
     avgLatencyMs: number | null;
     p95LatencyMs: number | null;
+    timeoutSeconds: number | null;
     reroutedCalls: number;
     stitchedCalls: number;
     lastCallAtMs: number | null;
@@ -67,6 +68,7 @@ export type ModelUsage = {
     outcome: string;
     errorCode: string | null;
     latencyMs: number;
+    timeoutSeconds: number | null;
     requests: number;
     inputTokens: number | null;
     outputTokens: number | null;

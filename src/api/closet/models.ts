@@ -18,6 +18,13 @@ export type ModelReferences = {
   overLimit: ReferenceOverLimit;
   revision: number;
 };
+export type ModelTimeout = {
+  seconds: number;
+  custom: number | null;
+  providerSeconds: number;
+  appliesToChat: boolean;
+  revision: number;
+};
 export type ModelHealth = {
   state: "OK" | "PAUSED";
   consecutiveFailures: number;
@@ -57,6 +64,7 @@ export type ModelEntry = {
   deletable: boolean;
   editable: boolean;
   references?: ModelReferences;
+  timeout: ModelTimeout;
   health: ModelHealth;
 };
 export type ModelRouting = {
@@ -164,6 +172,15 @@ export const putEntryReferences = (
   http.request<ApiResponse<ModelEntry>>(
     "put",
     `${root}/entries/${part(id)}/references`,
+    { data }
+  );
+export const putEntryTimeout = (
+  id: string,
+  data: { timeoutSeconds: number | null; revision: number }
+) =>
+  http.request<ApiResponse<ModelEntry>>(
+    "put",
+    `${root}/entries/${part(id)}/timeout`,
     { data }
   );
 export const deleteEntry = (id: string) =>

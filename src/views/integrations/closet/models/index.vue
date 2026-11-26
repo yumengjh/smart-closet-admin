@@ -15,6 +15,7 @@ import {
   getModels,
   probeProvider,
   putEntryReferences,
+  putEntryTimeout,
   putRouting,
   resumeEntry,
   testEntry,
@@ -132,6 +133,7 @@ const fail = (error: unknown, fallback: string) => {
     providerOpen.value = false;
     entryOpen.value = false;
     referencesOpen.value = false;
+    timeoutOpen.value = false;
     void load();
   } else message(response?.data?.message || fallback, { type: "error" });
 };
@@ -275,6 +277,39 @@ const saveReferences = async () => {
     )
   )
     referencesOpen.value = false;
+};
+
+const timeoutOpen = ref(false);
+const timeoutCurrent = ref<ModelEntry>();
+const timeoutSeconds = ref<number>();
+const openTimeout = (row: ModelEntry) => {
+  if (row.capability === "CHAT" || !row.timeout) return;
+  timeoutCurrent.value = row;
+  timeoutSeconds.value = row.timeout.custom ?? undefined;
+  timeoutOpen.value = true;
+};
+const saveTimeout = async () => {
+  const current = timeoutCurrent.value;
+  if (!current?.timeout || current.capability === "CHAT") return;
+  const seconds = timeoutSeconds.value;
+  if (
+    seconds != null &&
+    (!Number.isInteger(seconds) || seconds < 5 || seconds > 600)
+  ) {
+    message("请输入 5 到 600 之间的整数，或清空以跟随服务商", {
+      type: "warning"
+    });
+    return;
+  }
+  if (
+    await mutate(() =>
+      putEntryTimeout(current.id, {
+        timeoutSeconds: seconds ?? null,
+        revision: current.timeout.revision
+      })
+    )
+  )
+    timeoutOpen.value = false;
 };
 
 const providerOpen = ref(false);
@@ -825,6 +860,9 @@ onMounted(() => {
             <p v-if="tab === 'IMAGE'" class="help">
               上身图和创作跟随生图；形象图可单独选择模型。参考图超过上限时按每个模型的“参考图设置”处理。
             </p>
+            <p v-if="tab === 'CHAT'" class="help">
+              对话模型的等待由助手整轮时限控制。
+            </p>
             <el-table
               :data="overview.entries.filter(entry => entry.capability === tab)"
             >
@@ -864,6 +902,21 @@ onMounted(() => {
                   </template>
                 </template>
               </el-table-column>
+              <el-table-column
+                v-if="tab !== 'CHAT'"
+                label="等待上限"
+                min-width="170"
+              >
+                <template #default="{ row }">
+                  <template v-if="row.timeout">
+                    {{ row.timeout.seconds }} 秒<span
+                      v-if="row.timeout.custom == null"
+                      class="text-gray-500"
+                      >（跟随服务商）</span
+                    >
+                  </template>
+                </template>
+              </el-table-column>
               <el-table-column label="路由" width="90"
                 ><template #default="{ row }">{{
                   row.inUse === "ACTIVE"
@@ -899,7 +952,7 @@ onMounted(() => {
                   ></template
                 ></el-table-column
               >
-              <el-table-column label="操作" width="210" fixed="right"
+              <el-table-column label="操作" width="300" fixed="right"
                 ><template #default="{ row }"
                   ><el-button
                     v-if="row.capability === 'IMAGE'"
@@ -908,6 +961,13 @@ onMounted(() => {
                     :disabled="!writable || busy || !row.references"
                     @click="openReferences(row)"
                     >参考图设置</el-button
+                  ><el-button
+                    v-if="row.capability !== 'CHAT'"
+                    link
+                    type="primary"
+                    :disabled="!writable || busy || !row.timeout"
+                    @click="openTimeout(row)"
+                    >等待上限</el-button
                   ><el-button
                     v-if="row.capability !== 'IMAGE'"
                     link
@@ -1257,6 +1317,34 @@ onMounted(() => {
       <template #footer>
         <el-button @click="referencesOpen = false">取消</el-button>
         <el-button type="primary" :loading="busy" @click="saveReferences"
+          >保存</el-button
+        >
+      </template>
+    </el-dialog>
+    <el-dialog v-model="timeoutOpen" title="等待上限" width="min(600px, 95vw)">
+      <el-form label-position="top">
+        <el-form-item label="等待上限（秒）">
+          <el-input-number
+            v-model="timeoutSeconds"
+            :min="5"
+            :max="600"
+            :step="1"
+            step-strictly
+            :placeholder="`跟随服务商：${timeoutCurrent?.timeout?.providerSeconds} 秒`"
+          />
+          <p class="help">
+            超过这个时间还没返回就算超时（PROVIDER_TIMEOUT）。超时不代表服务商已经取消，可能照样计费；建议设成这个模型平时
+            P95 耗时的 1.5～2 倍。
+          </p>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="timeoutOpen = false">取消</el-button>
+        <el-button
+          type="primary"
+          :disabled="!writable"
+          :loading="busy"
+          @click="saveTimeout"
           >保存</el-button
         >
       </template>

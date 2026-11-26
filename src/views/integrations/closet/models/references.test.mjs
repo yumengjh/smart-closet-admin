@@ -22,6 +22,15 @@ for (const body of [
   assert.equal(calls.at(-1)[1], "/closet/models/entries/cfg%3Aimage%2Fa/references");
   assert.deepEqual(calls.at(-1)[2].data, body);
 }
+for (const body of [
+  { timeoutSeconds: null, revision: 0 },
+  { timeoutSeconds: 600, revision: 7 }
+]) {
+  api.putEntryTimeout("cfg:image/a", body);
+  assert.equal(calls.at(-1)[0], "put");
+  assert.equal(calls.at(-1)[1], "/closet/models/entries/cfg%3Aimage%2Fa/timeout");
+  assert.deepEqual(calls.at(-1)[2].data, body);
+}
 for (const name of ["index.vue", "ModelUsage.vue"]) {
   const source = await readFile(new URL(name, import.meta.url), "utf8");
   const parsed = parse(source, { filename: name });
@@ -34,6 +43,10 @@ for (const name of ["index.vue", "ModelUsage.vue"]) {
     assert.match(source, /response\?\.status === 409[\s\S]*?referencesOpen\.value = false;[\s\S]*?void load\(\)/);
     assert.match(source, /v-if="row\.capability === 'IMAGE'"[\s\S]*?@click="openReferences\(row\)"/);
     assert.match(source, /options\.overLimit = entryForm\.overLimit/);
+    assert.match(source, /v-if="tab !== 'CHAT'"\s+label="等待上限"/);
+    assert.match(source, /row\.timeout\.custom == null/);
+    assert.match(source, /对话模型的等待由助手整轮时限控制。/);
+    assert.match(source, /v-if="row\.capability !== 'CHAT'"[\s\S]*?:disabled="!writable \|\| busy \|\| !row\.timeout"[\s\S]*?@click="openTimeout\(row\)"/);
   } else {
     assert.match(source, /prop="stitchedCalls"/);
     assert.match(source, /v-if="row\.stitched > 0"/);
@@ -91,3 +104,82 @@ assert.match(source, /routingSlots: RoutingSlot\[\] = \[\.\.\.capabilities, "POR
 assert.match(source, /overview\.routing\.IMAGE\?\.effective/);
 assert.match(source, /PORTRAIT_ACTIVE"[\s\S]*?形象图生效[\s\S]*?PORTRAIT_FALLBACK"[\s\S]*?形象图备用/);
 assert.doesNotMatch(source, /ClosetCreationCapabilities/);
+
+// Both settings use one revision. Each save reloads the model before the
+// other dialog is opened, including for deployment-configured entries.
+const settingsCode = [
+  extract("const fail =", "const confirm ="),
+  extract("const referencesOpen =", "const providerOpen ="),
+  "globalThis.settings = { openReferences, saveReferences, openTimeout, saveTimeout, referencesOpen, referencesForm, timeoutOpen, timeoutSeconds };"
+].join("\n");
+let revision = 0;
+let custom = null;
+let limit = null;
+let reloads = 0;
+let conflict = false;
+const settingsCalls = [];
+const messages = [];
+const row = () => ({
+  id: "cfg:image/a", capability: "IMAGE", source: "CONFIG", editable: false,
+  references: { customLimit: limit, overLimit: "STITCH", revision },
+  timeout: { custom, seconds: custom ?? 180, providerSeconds: 180, revision }
+});
+let latest = row();
+const settingsContext = {
+  ref: value => ({ value }), reactive: value => value,
+  busy: { value: false }, writable: { value: true }, unavailable: { value: false },
+  providerOpen: { value: false }, entryOpen: { value: false },
+  isClosetServiceUnavailable: () => false,
+  message: (...args) => messages.push(args),
+  load: async () => { reloads++; latest = row(); },
+  putEntryReferences: async (id, body) => {
+    settingsCalls.push([id, body]);
+    assert.equal(body.revision, revision);
+    limit = body.maxReferenceImages;
+    revision++;
+  },
+  putEntryTimeout: async (id, body) => {
+    settingsCalls.push([id, body]);
+    if (conflict) throw { response: { status: 409 } };
+    assert.equal(body.revision, revision);
+    custom = body.timeoutSeconds;
+    revision++;
+  }
+};
+vm.runInNewContext(ts.transpileModule(settingsCode, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022 }
+}).outputText, settingsContext);
+const settings = settingsContext.settings;
+settings.openTimeout(latest);
+assert.equal(settings.timeoutSeconds.value, undefined);
+settings.timeoutSeconds.value = 240;
+await settings.saveTimeout();
+assert.equal(settingsCalls.at(-1)[1].timeoutSeconds, 240);
+assert.equal(settings.timeoutOpen.value, false);
+settings.openReferences(latest);
+settings.referencesForm.maxReferenceImages = 3;
+await settings.saveReferences();
+assert.equal(settingsCalls.at(-1)[1].revision, 1);
+settings.openTimeout(latest);
+assert.equal(settings.timeoutSeconds.value, 240);
+settings.timeoutSeconds.value = undefined;
+await settings.saveTimeout();
+assert.equal(settingsCalls.at(-1)[1].revision, 2);
+assert.equal(settingsCalls.at(-1)[1].timeoutSeconds, null);
+settings.openTimeout(latest);
+settings.timeoutSeconds.value = 601;
+const beforeInvalid = settingsCalls.length;
+await settings.saveTimeout();
+assert.equal(settingsCalls.length, beforeInvalid);
+settings.timeoutSeconds.value = 5;
+conflict = true;
+await settings.saveTimeout();
+assert.equal(settings.timeoutOpen.value, false);
+assert.equal(reloads, 4);
+assert.match(messages.at(-1)[0], /重新加载/);
+settings.openTimeout({ ...latest, capability: "CHAT" });
+assert.equal(settings.timeoutOpen.value, false);
+settingsContext.writable.value = false;
+settings.openTimeout(latest);
+await settings.saveTimeout();
+assert.equal(settingsCalls.length, beforeInvalid + 1);
