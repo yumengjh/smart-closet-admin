@@ -44,16 +44,18 @@ export type ModelEntry = {
   enabled: boolean;
   source: ModelSource;
   revision: number;
+  inUse: "ACTIVE" | "FALLBACK" | null;
   deletable: boolean;
   editable: boolean;
   health: ModelHealth;
 };
 export type ModelRouting = {
-  active: string;
+  active: string | null;
   fallback: string | null;
-  effective: string;
+  effective: string | null;
   configured: boolean;
   revision: number;
+  updatedAtMs: number | null;
 };
 export type ModelOverview = {
   masterKeyConfigured: boolean;
@@ -143,7 +145,10 @@ export const editEntry = (
 export const deleteEntry = (id: string) =>
   http.request<ApiResponse<void>>("delete", `${root}/entries/${part(id)}`);
 export const resumeEntry = (id: string) =>
-  http.request<ApiResponse<void>>("post", `${root}/entries/${part(id)}/resume`);
+  http.request<ApiResponse<ModelEntry>>(
+    "post",
+    `${root}/entries/${part(id)}/resume`
+  );
 export const testEntry = (id: string) =>
   http.request<ApiResponse<ModelTestResult>>(
     "post",
@@ -160,4 +165,7 @@ export const putRouting = (
     { data }
   );
 export const deleteRouting = (capability: Capability) =>
-  http.request<ApiResponse<void>>("delete", `${root}/routing/${capability}`);
+  http.request<ApiResponse<ModelRouting>>(
+    "delete",
+    `${root}/routing/${capability}`
+  );

@@ -47,6 +47,18 @@ assert.match(page, /会向上游发一次真实请求，可能产生少量费用
 assert.match(page, /entry\.enabled\s*&&\s*overview\.value\?\.providers\.some\(\s*provider\s*=>\s*provider\.id === entry\.providerId\s*&&\s*provider\.status === "READY"/);
 assert.match(page, /revision: current\.revision/);
 assert.match(page, /providerForm\.apiKey = ''/);
+assert.match(page, /row\.inUse === "ACTIVE"[\s\S]*row\.inUse === "FALLBACK"/);
+assert.match(page, /healthText\(row\.health\)/);
+assert.match(page, /v-if="row\.editable"/);
+assert.match(page, /!row\.deletable/);
+assert.match(page, /row\.kind === "REROUTED" \? entryName\(row\.code\)/);
+assert.match(page, /对话模型的 token 参数名只影响“试一次”/);
+assert.match(page, /if \(row\.capability === "IMAGE"\) return/);
+assert.match(page, /v-if="row\.capability !== 'IMAGE'"/);
+const apiSource = await read("src/api/closet/models.ts");
+assert.match(apiSource, /inUse: "ACTIVE" \| "FALLBACK" \| null/);
+assert.match(apiSource, /deleteRouting[\s\S]*ApiResponse<ModelRouting>/);
+assert.match(apiSource, /resumeEntry[\s\S]*ApiResponse<ModelEntry>/);
 const router = await read("src/router/utils.ts");
 assert.match(router, /"closet-models":\s*\(\) =>\s*import\("@\/views\/integrations\/closet\/models\/index\.vue"\)/);
 const icons = await read("src/components/ReIcon/src/offlineIcon.ts");

@@ -195,6 +195,7 @@ const removeEntry = async (row: ModelEntry) => {
     await mutate(() => deleteEntry(row.id), "已删除");
 };
 const tryEntry = async (row: ModelEntry) => {
+  if (row.capability === "IMAGE") return;
   if (
     !(await confirm(
       "会向上游发一次真实请求，可能产生少量费用，并计入全站模型预算。",
@@ -294,11 +295,17 @@ const addHost = () => {
 };
 const saveProvider = async () => {
   if (
-    (!providerCurrent.value && !/^[a-z0-9-]{2,32}$/.test(providerForm.id)) ||
+    (!providerCurrent.value &&
+      (!/^[a-z0-9][a-z0-9-]{1,31}$/.test(providerForm.id) ||
+        providerForm.id.startsWith("cfg") ||
+        providerForm.apiKey.length < 8 ||
+        providerForm.apiKey.length > 400)) ||
     !providerForm.name.trim() ||
     !providerForm.baseUrl.trim()
   ) {
-    message("请填写有效的 ID、名称和地址", { type: "warning" });
+    message("请填写有效的 ID、名称、地址和密钥（密钥至少 8 位）", {
+      type: "warning"
+    });
     return;
   }
   const common = {
@@ -728,6 +735,15 @@ onMounted(() => {
               keyParameters(row)
             }}</template></el-table-column
           >
+          <el-table-column label="路由" width="90"
+            ><template #default="{ row }">{{
+              row.inUse === "ACTIVE"
+                ? "生效"
+                : row.inUse === "FALLBACK"
+                  ? "备用"
+                  : "—"
+            }}</template></el-table-column
+          >
           <el-table-column label="开启" width="75"
             ><template #default="{ row }"
               ><el-switch
@@ -818,8 +834,12 @@ onMounted(() => {
             ><template #default="{ row }">{{
               eventNames[row.kind as keyof typeof eventNames]
             }}</template></el-table-column
-          ><el-table-column prop="code" label="原因代码"
-        /></el-table>
+          ><el-table-column label="原因 / 改用模型" min-width="180"
+            ><template #default="{ row }">{{
+              row.kind === "REROUTED" ? entryName(row.code) : row.code || "—"
+            }}</template></el-table-column
+          >
+        </el-table>
       </el-card>
     </template>
     <el-dialog
@@ -997,7 +1017,11 @@ onMounted(() => {
                 label="max_completion_tokens"
                 value="max_completion_tokens" /><el-option
                 label="max_tokens"
-                value="max_tokens" /></el-select></el-form-item
+                value="max_tokens"
+            /></el-select>
+            <p v-if="entryForm.capability === 'CHAT'" class="help">
+              对话模型的 token 参数名只影响“试一次”，不影响用户助手对话。
+            </p></el-form-item
           ><el-form-item label="reasoning"
             ><el-select v-model="entryForm.reasoningEffort"
               ><el-option label="不发送" value="" /><el-option
