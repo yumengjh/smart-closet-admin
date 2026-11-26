@@ -76,14 +76,6 @@ const cases = [
     "get",
     "/closet/creations/generation-options"
   ],
-  ["getCreationCapabilities", [], "get", "/closet/creations/capabilities"],
-  [
-    "saveCreationCapability",
-    [{ purpose: "ART_CREATION", version: 0 }],
-    "put",
-    "/closet/creations/capabilities",
-    { purpose: "ART_CREATION", version: 0 }
-  ],
   [
     "getCreationUsage",
     ["2026-11-01", "2026-11-02"],
@@ -173,7 +165,6 @@ assert.ok(calls.at(-1)[1].endsWith("v%2Fa"), "version IDs must be encoded");
 
 for (const key of [
   "closet-creation-templates",
-  "closet-creation-capabilities",
   "closet-creation-usage"
 ]) {
   for (const file of [
@@ -203,12 +194,6 @@ assert.ok(!creationRoutes.includes("Guide.vue"), "guide page is removed");
 
 const creationPages = [
   ["templates", "closet-creation-templates", "ri/image-line", "Templates.vue"],
-  [
-    "capabilities",
-    "closet-creation-capabilities",
-    "ri/settings-3-line",
-    "Capabilities.vue"
-  ],
   ["usage", "closet-creation-usage", "ri/bar-chart-line", "Usage.vue"],
   ["showcases", "closet-creation-showcases", "ri/gallery-line", "Showcases.vue"]
 ];
@@ -237,6 +222,25 @@ for (const [route, key, icon, view] of creationPages) {
     `offline icon import or registration missing for ${icon}`
   );
 }
+assert.ok(!creationRoutes.includes("/creation/capabilities"));
+for (const file of [
+  "../src/router/utils.ts",
+  "../src/api/routes.ts",
+  "../src/api/navigation.ts",
+  "../src/views/system/menu/index.vue"
+]) {
+  assert.ok(!(await readProjectFile(file)).includes("closet-creation-capabilities"));
+}
+assert.equal(exports.getCreationCapabilities, undefined);
+assert.equal(exports.saveCreationCapability, undefined);
+const editor = await readProjectFile("../src/views/integrations/closet/creation/EffectEditor.vue");
+assert.match(editor, /效果用哪个生图模型，在[\s\S]*?<router-link to="\/closet\/models">模型调配<\/router-link>[\s\S]*?里统一设置。/);
+assert.match(editor, /getCreationGenerationOptions/);
+const opsPage = await readProjectFile("../src/views/integrations/closet/ops/index.vue");
+assert.match(opsPage, /本地模型与服务商[\s\S]*?<router-link to="\/closet\/models">去模型调配<\/router-link>/);
+assert.doesNotMatch(opsPage, /creation\/capabilities|ClosetCreationCapabilities/);
+const modelsPage = await readProjectFile("../src/views/integrations/closet/models/index.vue");
+assert.doesNotMatch(modelsPage, /creation\/capabilities|ClosetCreationCapabilities/);
 console.log(
-  "Creation API: 28 operations, static/dynamic navigation, and offline icons verified."
+  "Creation API: 26 operations, static/dynamic navigation, and offline icons verified."
 );

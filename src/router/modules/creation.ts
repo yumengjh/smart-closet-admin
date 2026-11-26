@@ -37,18 +37,6 @@ export default {
         icon: "ri/bar-chart-line",
         auths: ["closet:creation:read"]
       }
-    },
-    {
-      path: "/creation/capabilities",
-      name: "ClosetCreationCapabilities",
-      component: () =>
-        import("@/views/integrations/closet/creation/Capabilities.vue"),
-      meta: {
-        title: "模型高级设置",
-        icon: "ri/settings-3-line",
-        showLink: false,
-        auths: ["closet:creation:read"]
-      }
     }
   ]
 } satisfies RouteConfigsTable;

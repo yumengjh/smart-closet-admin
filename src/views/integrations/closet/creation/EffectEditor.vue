@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
 import { ElMessageBox } from "element-plus";
 import {
   createCreationVersion,
@@ -31,7 +30,6 @@ import {
 
 const props = defineProps<{ templateId: string }>();
 const emit = defineEmits<{ back: [] }>();
-const router = useRouter();
 const { can } = useCurrentPermissions();
 const canWrite = computed(() => can("closet:creation:write"));
 const canPublish = computed(() => can("closet:creation:publish"));
@@ -350,12 +348,9 @@ onMounted(async () => {
           />
         </el-select>
         <div class="hint">
-          <el-link
-            type="primary"
-            underline="never"
-            @click="router.push('/creation/capabilities')"
-            >模型高级设置</el-link
-          >
+          效果用哪个生图模型，在
+          <router-link to="/closet/models">模型调配</router-link>
+          里统一设置。
         </div>
       </section>
 
@@ -479,9 +474,10 @@ onMounted(async () => {
 
 <style scoped>
 .editor {
-  min-height: 120px;
   max-width: 960px;
+  min-height: 120px;
 }
+
 .head {
   display: flex;
   flex-wrap: wrap;
@@ -489,13 +485,16 @@ onMounted(async () => {
   align-items: center;
   margin: 8px 0 16px;
 }
+
 .head h1 {
   margin: 0;
   font-size: 24px;
 }
+
 .end {
   margin-left: auto;
 }
+
 .readonly-bar {
   display: flex;
   flex-wrap: wrap;
@@ -503,18 +502,22 @@ onMounted(async () => {
   align-items: center;
   margin-bottom: 8px;
 }
+
 .caption,
 .hint {
   font-size: 13px;
   color: var(--el-text-color-secondary);
 }
+
 .hint {
   margin-top: 6px;
 }
+
 .step {
   padding: 20px 0;
   border-top: 1px solid var(--el-border-color-lighter);
 }
+
 .step h2 {
   display: flex;
   gap: 8px;
@@ -522,26 +525,32 @@ onMounted(async () => {
   margin: 0 0 12px;
   font-size: 16px;
 }
+
 .no {
   color: var(--el-text-color-secondary);
 }
+
 .field {
   display: block;
   width: min(100%, 420px);
 }
+
 .form {
   max-width: 760px;
 }
+
 .prompt :deep(textarea) {
   font-family: var(--el-font-family-monospace, ui-monospace, Menlo, monospace);
   font-size: 13px;
 }
+
 .preview {
   display: flex;
   gap: 12px;
   align-items: flex-end;
   margin-bottom: 8px;
 }
+
 .preview img,
 .preview .ph {
   width: 120px;
@@ -550,21 +559,26 @@ onMounted(async () => {
   background: var(--el-fill-color-light);
   border-radius: 4px;
 }
+
 .side {
   margin: 0 0 0 8px;
 }
+
 .save-row {
   display: flex;
   gap: 12px;
   align-items: center;
 }
+
 .warn {
   font-size: 13px;
   color: var(--el-color-warning);
 }
+
 .history {
   margin-top: 8px;
 }
+
 .version {
   display: flex;
   flex-wrap: wrap;
