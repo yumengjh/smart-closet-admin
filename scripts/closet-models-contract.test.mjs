@@ -54,6 +54,7 @@ assert.match(page, /!row\.deletable/);
 assert.match(page, /对话模型的 token 参数名只影响“试一次”/);
 assert.match(page, /if \(row\.capability === "IMAGE"\) return/);
 assert.match(page, /v-if="row\.capability !== 'IMAGE'"/);
+assert.match(page, /row\.kind === "REROUTED"\s*\?\s*entryName\(row\.code\)/);
 const apiSource = await read("src/api/closet/models.ts");
 assert.match(apiSource, /inUse: "ACTIVE" \| "FALLBACK" \| null/);
 assert.match(apiSource, /deleteRouting[\s\S]*ApiResponse<ModelRouting>/);
