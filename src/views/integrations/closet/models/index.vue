@@ -333,6 +333,14 @@ const providerForm = reactive<{
   imageHosts: []
 });
 const hostInput = ref("");
+const anyPublicImageHost = computed({
+  get: () => providerForm.imageHosts.includes("*"),
+  set: (enabled: boolean) => {
+    providerForm.imageHosts = enabled
+      ? ["*"]
+      : providerForm.imageHosts.filter(host => host !== "*");
+  }
+});
 const openProvider = (row?: ModelProvider) => {
   providerCurrent.value = row;
   preset.value = "";
@@ -361,6 +369,17 @@ const openProvider = (row?: ModelProvider) => {
   );
   providerOpen.value = true;
 };
+const addRejectedHosts = (row: ModelProvider) => {
+  openProvider(row);
+  if (!providerForm.imageHosts.includes("*")) {
+    providerForm.imageHosts = [
+      ...new Set([
+        ...providerForm.imageHosts,
+        ...row.rejectedImageHosts.map(item => item.host)
+      ])
+    ];
+  }
+};
 const applyPreset = (value: string) => {
   if (!value) return;
   providerForm.kind = "OPENAI_COMPATIBLE";
@@ -376,8 +395,13 @@ const applyPreset = (value: string) => {
 };
 const addHost = () => {
   const host = hostInput.value.trim();
-  if (host && !providerForm.imageHosts.includes(host))
-    providerForm.imageHosts.push(host);
+  if (host === "*") providerForm.imageHosts = ["*"];
+  else if (host && !providerForm.imageHosts.includes(host)) {
+    providerForm.imageHosts = [
+      ...providerForm.imageHosts.filter(item => item !== "*"),
+      host
+    ];
+  }
   hostInput.value = "";
 };
 const saveProvider = async () => {
@@ -763,8 +787,32 @@ onMounted(() => {
               <el-table-column label="名称" min-width="140"
                 ><template #default="{ row }"
                   >{{ row.name }}
-                  <div class="text-xs text-gray-500">
-                    {{ row.id }}
+                  <div class="text-xs text-gray-500">{{ row.id }}</div>
+                  <div
+                    v-if="row.rejectedImageHosts?.length"
+                    class="text-xs text-warning"
+                  >
+                    最近返回过不在可信域名里的图片地址：
+                    {{
+                      row.rejectedImageHosts
+                        .slice(0, 2)
+                        .map(item => `${item.host}（${item.count} 次）`)
+                        .join("、")
+                    }}<template v-if="row.rejectedImageHosts.length > 2"
+                      >等 {{ row.rejectedImageHosts.length }} 个</template
+                    >
+                    <el-button
+                      v-if="row.source === 'DATABASE'"
+                      link
+                      type="primary"
+                      :disabled="!writable || !row.editable"
+                      @click="addRejectedHosts(row)"
+                      >加入可信域名</el-button
+                    >
+                    <span v-else class="text-gray-500"
+                      >部署配置的服务商请在 CLOSET_YUMG_IMAGE_HOSTS
+                      或配置文件里添加</span
+                    >
                   </div></template
                 ></el-table-column
               >
@@ -778,7 +826,18 @@ onMounted(() => {
                 label="地址"
                 min-width="190"
                 show-overflow-tooltip
-              /><el-table-column label="密钥"
+              />
+              <el-table-column label="可信图片域名" min-width="160">
+                <template #default="{ row }">
+                  <el-tag v-if="row.anyPublicImageHost" type="warning"
+                    >任意公网</el-tag
+                  >
+                  <span v-else>{{
+                    row.imageHosts?.join("、") || "未配置"
+                  }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="密钥"
                 ><template #default="{ row }">{{
                   row.apiKeyHint || "未配置"
                 }}</template></el-table-column
@@ -1101,8 +1160,12 @@ onMounted(() => {
             :min="1"
             :max="600"
         /></el-form-item>
-        <el-form-item label="可信图片域名"
-          ><div class="host-list">
+        <el-form-item label="可信图片域名">
+          <el-switch
+            v-model="anyPublicImageHost"
+            active-text="允许任意公网图片地址"
+          />
+          <div class="host-list">
             <el-tag
               v-for="host in providerForm.imageHosts"
               :key="host"
@@ -1121,7 +1184,9 @@ onMounted(() => {
             @keydown.enter.prevent="addHost"
           /><el-button @click="addHost">添加域名</el-button>
           <p class="help">
-            上游返回图片地址而不是图片数据时，只从这些域名下载；* 只匹配一段。
+            上游返回图片地址而不是图片数据时，只从这些域名下载；*
+            只代表一段。不知道域名又信任这个服务商时，可以只填一个
+            *（任意公网地址，仍然禁止内网）。
           </p></el-form-item
         > </el-form
       ><template #footer
@@ -1378,6 +1443,10 @@ onMounted(() => {
   flex-wrap: wrap;
   gap: 0.5rem;
   width: 100%;
+}
+
+.text-warning {
+  color: var(--el-color-warning);
 }
 
 @media (width <= 900px) {
