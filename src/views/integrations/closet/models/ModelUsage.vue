@@ -12,8 +12,10 @@ import { message } from "@/utils/message";
 import ChartView from "../insights/ChartView.vue";
 import ClosetUnavailable from "../ClosetUnavailable.vue";
 import { formatTime, percent, useClosetRequest } from "../useClosetRequest";
+import TraceDrawer from "./TraceDrawer.vue";
 
 const props = defineProps<{ providers: ModelProvider[] }>();
+const traceDrawer = ref<InstanceType<typeof TraceDrawer>>();
 const names: Record<Capability, string> = {
   VISION: "识图",
   IMAGE: "生图",
@@ -543,6 +545,18 @@ onMounted(() => {
           </div></template
         >
         <el-table v-if="data.recent.length" :data="data.recent">
+          <el-table-column label="尝试链" min-width="100">
+            <template #default="{ row }">
+              <el-button
+                v-if="row.traceId"
+                link
+                type="primary"
+                @click="traceDrawer?.open(row.traceId)"
+                >{{ row.traceId.slice(0, 8) }}</el-button
+              >
+              <span v-else>—</span>
+            </template>
+          </el-table-column>
           <el-table-column label="时间" min-width="170"
             ><template #default="{ row }">{{
               formatTime(row.atMs)
@@ -605,6 +619,7 @@ onMounted(() => {
         ><el-empty v-else description="这段时间没有调用记录" />
       </el-card>
     </template>
+    <TraceDrawer ref="traceDrawer" />
   </div>
 </template>
 

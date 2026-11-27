@@ -76,6 +76,7 @@ export type ModelUsage = {
     lastAtMs: number;
   }[];
   recent: {
+    traceId: string | null;
     atMs: number;
     capability: Capability;
     providerId: string;
