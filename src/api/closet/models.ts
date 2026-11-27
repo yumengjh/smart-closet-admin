@@ -43,6 +43,8 @@ export type ModelProvider = {
   apiKeyHint: string | null;
   timeoutSeconds: number;
   imageHosts: string[];
+  anyPublicImageHost: boolean;
+  rejectedImageHosts: { host: string; count: number; lastAtMs: number }[];
   status: "READY" | "NO_KEY" | "KEY_UNREADABLE" | "SHADOWED";
   revision: number;
   deletable: boolean;
