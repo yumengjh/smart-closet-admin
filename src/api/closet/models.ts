@@ -3,12 +3,13 @@ import type { ApiResponse } from "../user";
 
 export type Capability = "VISION" | "IMAGE" | "CHAT";
 export type RoutingSlot = Capability | "PORTRAIT";
-export type ProviderKind = "OPENAI_COMPATIBLE" | "GEMINI";
+export type ProviderKind = "OPENAI_COMPATIBLE" | "GEMINI" | "AZURE_OPENAI";
 export type ModelProtocol =
   | "OPENAI_CHAT"
   | "OPENAI_IMAGES"
   | "GEMINI"
-  | "DASHSCOPE_IMAGE";
+  | "DASHSCOPE_IMAGE"
+  | "OPENROUTER_IMAGES";
 export type ModelSource = "CONFIG" | "DATABASE";
 export type ReferenceOverLimit = "STITCH" | "REJECT";
 export type ModelReferences = {
@@ -81,6 +82,7 @@ export type ModelRouting = {
 export type ModelOverview = {
   masterKeyConfigured: boolean;
   failoverEnabled: boolean;
+  alerts?: { firing: number };
   providers: ModelProvider[];
   entries: ModelEntry[];
   routing: Partial<Record<RoutingSlot, ModelRouting>>;
