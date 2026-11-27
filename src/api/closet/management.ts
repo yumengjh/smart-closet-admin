@@ -90,7 +90,10 @@ export type OpsStatus = {
     oldestQueuedAgeMs: number | null;
     failed24h: number;
   };
-  providers: Record<string, unknown>;
+  providers: Record<string, unknown> & {
+    pools?: Array<{ pool: string; available: number; total: number; degraded: boolean }>;
+    alertsFiring?: number;
+  };
   sessions: { active: number; onlineLast5Min: number };
   database?: { vendor: "H2" | "POSTGRESQL"; schemaVersion: string | null };
   generatedAtMs: number;
