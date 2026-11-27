@@ -14,6 +14,7 @@ type UsageCounts = {
   costs: UsageCost[];
   unpricedCalls: number;
 };
+type UsageGroup = { calls: number; ok: number; failed: number; costs: UsageCost[] };
 export type ModelUsage = {
   scope: { from: string; to: string };
   totals: UsageCounts & { requests: number; cancelled: number };
@@ -36,6 +37,8 @@ export type ModelUsage = {
     reroutedCalls: number;
     stitchedCalls: number;
     lastCallAtMs: number | null;
+    notExecutedRate: number | null;
+    maybeExecutedRate: number | null;
   })[];
   byPurpose: {
     capability: Capability;
@@ -43,6 +46,10 @@ export type ModelUsage = {
     calls: number;
     failed: number;
   }[];
+  byPool: (UsageGroup & { pool: string })[];
+  byTier: (UsageGroup & { tierRequested: string; tierUsed: string | null; degraded: boolean })[];
+  decisions: (UsageGroup & { decision: string })[];
+  probe: { free: UsageGroup; paid: UsageGroup };
   daily: {
     date: string;
     calls: number;
