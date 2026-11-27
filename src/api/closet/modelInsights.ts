@@ -189,3 +189,40 @@ export const decisions: Record<string, string> = {
   PROBE: "探活",
   MANUAL: "手动"
 };
+
+const errorNames: Record<string, string> = {
+  PROVIDER_CONNECT_TIMEOUT: "连接超时",
+  PROVIDER_UNREACHABLE: "连不上",
+  PROVIDER_CONNECTION_FAILED: "连接中断",
+  PROVIDER_NO_CHANNEL: "中转没有可用渠道",
+  PROVIDER_TIMEOUT: "等待超时",
+  PROVIDER_HTTP_401: "密钥或权限被拒",
+  PROVIDER_HTTP_403: "密钥或权限被拒",
+  PROVIDER_HTTP_402: "余额不足",
+  PROVIDER_HTTP_429: "限流",
+  PROVIDER_HTTP_500: "上游错误 500",
+  PROVIDER_HTTP_502: "上游错误 502",
+  PROVIDER_HTTP_503: "上游错误 503",
+  PROVIDER_HTTP_504: "上游错误 504",
+  PROVIDER_HTTP_529: "上游错误 529",
+  PROVIDER_HTTP_400: "请求被拒",
+  PROVIDER_HTTP_404: "请求被拒",
+  PROVIDER_HTTP_413: "请求被拒",
+  PROVIDER_HTTP_422: "请求被拒",
+  PROVIDER_CONTENT_FILTERED: "内容被拦截",
+  PROVIDER_EDITS_UNSUPPORTED: "不支持改图",
+  PROVIDER_NO_IMAGE: "没有返回图片",
+  PROVIDER_INVALID_RESPONSE: "返回格式不对",
+  PROVIDER_INVALID_IMAGE: "图片无效",
+  PROVIDER_IMAGE_DOWNLOAD_FAILED: "图片下载失败",
+  PROVIDER_IMAGE_HOST_NOT_ALLOWED: "图片域名不在可信列表",
+  PROVIDER_UPSTREAM_ERROR: "上游报错",
+  PROVIDER_ERROR: "上游报错",
+  PROVIDER_UNAVAILABLE: "暂不可用",
+  PROVIDER_INTERRUPTED: "被中断",
+  PROVIDER_NOT_CONFIGURED: "未配置",
+  PROVIDER_CONFIG_CHANGED: "配置已变化"
+};
+
+export const errorName = (code: string | null | undefined) =>
+  !code ? "—" : errorNames[code] ? `${errorNames[code]}（${code}）` : code;

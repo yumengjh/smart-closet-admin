@@ -172,10 +172,10 @@ onMounted(load);
           v-for="rule in settings.rules"
           :key="rule.rule"
           :label="names[rule.rule] || rule.name"
-          ><el-switch
-            v-model="rule.enabled"
-            :disabled="!writable" /></el-form-item
-      ></el-form>
+          ><el-switch v-model="rule.enabled" :disabled="!writable" />
+          <p class="text-xs text-gray-500">{{ rule.trigger }}</p></el-form-item
+        ></el-form
+      >
     </el-card>
   </div>
 </template>

@@ -28,6 +28,10 @@ const balances = ref<Balance[]>([]);
 const billingOpen = ref(false);
 const manualOpen = ref(false);
 const historyOpen = ref(false);
+const rawOpen = ref(false);
+const rawSnapshot = ref<Snapshot | null>(null);
+const rawProviderName = ref("");
+const paidSpendCaps = ref<Record<string, number>>({});
 const selected = ref<Balance>();
 const history = ref<Snapshot[]>([]);
 const form = ref({
@@ -50,9 +54,25 @@ const caps: Record<string, string> = {
   CHAT: "对话",
   IMAGE: "生图"
 };
+const sourceNames: Record<string, string> = {
+  NEWAPI: "NewAPI / OneAPI",
+  OPENROUTER: "OpenRouter",
+  MANUAL: "手动",
+  NONE: "未配置"
+};
+const sourceName = (source: string) => sourceNames[source] || source;
+const setProbe = (value: Probe) => {
+  probe.value = value;
+  paidSpendCaps.value = Object.fromEntries(
+    Object.entries(value.settings.paidSpendCapMicro).map(([key, amount]) => [
+      key,
+      amount / 1000000
+    ])
+  );
+};
 const loadProbe = () =>
   void run(getProbe, result => {
-    probe.value = result.data;
+    setProbe(result.data);
   });
 const loadBalances = () =>
   void run(getBalances, result => {
@@ -66,9 +86,19 @@ const saveSettings = () => {
   if (!probe.value) return;
   const current = probe.value;
   void run(
-    () => saveProbe({ ...current.settings, revision: current.revision }),
+    () =>
+      saveProbe({
+        ...current.settings,
+        paidSpendCapMicro: Object.fromEntries(
+          Object.entries(paidSpendCaps.value).map(([key, amount]) => [
+            key,
+            Math.round(amount * 1000000)
+          ])
+        ),
+        revision: current.revision
+      }),
     result => {
-      probe.value = result.data;
+      setProbe(result.data);
       message("探活设置已保存", { type: "success" });
     }
   );
@@ -81,6 +111,11 @@ const doProbe = (id: string) =>
       load();
     }
   );
+const openRaw = (snapshot: Snapshot | null, providerName: string) => {
+  rawSnapshot.value = snapshot;
+  rawProviderName.value = providerName;
+  rawOpen.value = true;
+};
 const editBilling = (row: Balance) => {
   selected.value = row;
   const b = row.billing;
@@ -119,6 +154,7 @@ const saveSource = () => {
     result => {
       selected.value = result.data;
       billingOpen.value = false;
+      openRaw(result.data.reported, result.data.providerName);
       message("余额来源已保存，请核对上游原始数字与换算结果", {
         type: "success"
       });
@@ -239,11 +275,13 @@ onMounted(load);
         ><el-form-item
           v-for="(name, key) in caps"
           :key="key"
-          :label="`${name}每日花费上限（人民币微元）`"
+          :label="`${name}每日花费上限（元）`"
           ><el-input-number
-            v-model="probe.settings.paidSpendCapMicro[key]"
+            v-model="paidSpendCaps[key]"
             :min="0"
-            :max="1000000000"
+            :max="1000"
+            :step="0.01"
+            :precision="4"
             :disabled="!writable" /></el-form-item
         ><el-form-item label="美元折算人民币汇率"
           ><el-input-number
@@ -324,9 +362,11 @@ onMounted(load);
         :data="balances"
         empty-text="还没有服务商；未设置余额来源时不自动查询"
         ><el-table-column prop="providerName" label="服务商" /><el-table-column
-          prop="billing.source"
           label="来源"
-        /><el-table-column label="上游余额 / 时间" min-width="200"
+          ><template #default="{ row }">{{
+            sourceName(row.billing.source)
+          }}</template></el-table-column
+        ><el-table-column label="上游余额 / 时间" min-width="200"
           ><template #default="{ row }"
             ><template v-if="row.reported"
               >{{
@@ -334,10 +374,11 @@ onMounted(load);
                   row.reported.converted.balanceMicro,
                   row.reported.converted.currency
                 )
-              }}<br />{{ time(row.reported.atMs) }}<br />原始：{{
-                JSON.stringify(row.reported.raw.json)
-              }}
-              {{ row.reported.raw.unit }}</template
+              }}<br />{{ time(row.reported.atMs) }}<br /><el-button
+                link
+                @click="openRaw(row.reported, row.providerName)"
+                >查看原始数字</el-button
+              ></template
             ><template v-else>暂无读数</template></template
           ></el-table-column
         ><el-table-column label="本地估算"
@@ -426,9 +467,7 @@ onMounted(load);
         ><el-form-item label="余额不足自动移出"
           ><el-switch v-model="form.autoRemove" /></el-form-item
       ></el-form>
-      <p class="text-xs text-gray-500">
-        首次保存后请核对表格中上游原始数字与换算结果。
-      </p>
+      <p class="text-xs text-gray-500">保存后请核对上游原始数字与换算结果。</p>
       <template #footer
         ><el-button @click="billingOpen = false">取消</el-button
         ><el-button type="primary" @click="saveSource"
@@ -436,6 +475,35 @@ onMounted(load);
         ></template
       ></el-dialog
     >
+    <el-dialog
+      v-model="rawOpen"
+      :title="`${rawProviderName}余额对照`"
+      width="700px"
+    >
+      <template v-if="rawSnapshot">
+        <div class="flex flex-wrap gap-6">
+          <div class="min-w-0 flex-1">
+            <p>上游原始数字（{{ rawSnapshot.raw.unit || "未提供单位" }}）</p>
+            <pre style="overflow-wrap: anywhere; white-space: pre-wrap">{{
+              JSON.stringify(rawSnapshot.raw.json, null, 2)
+            }}</pre>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p>换算结果</p>
+            <p>
+              {{
+                money(
+                  rawSnapshot.converted.balanceMicro,
+                  rawSnapshot.converted.currency
+                )
+              }}
+            </p>
+            <p>读数时间：{{ time(rawSnapshot.atMs) }}</p>
+          </div>
+        </div>
+      </template>
+      <p v-else>暂无余额读数，请刷新余额后查看。</p>
+    </el-dialog>
     <el-dialog v-model="manualOpen" title="手动录入余额" width="500px"
       ><el-form label-width="100px"
         ><el-form-item label="余额"
@@ -462,10 +530,15 @@ onMounted(load);
           ><template #default="{ row }">{{
             time(row.atMs)
           }}</template></el-table-column
-        ><el-table-column prop="source" label="来源" /><el-table-column
-          label="上游原始数字"
+        ><el-table-column label="来源"
+          ><template #default="{ row }">{{
+            sourceName(row.source)
+          }}</template></el-table-column
+        ><el-table-column label="上游原始数字"
           ><template #default="{ row }"
-            >{{ JSON.stringify(row.raw.json) }} {{ row.raw.unit }}</template
+            ><el-button link @click="openRaw(row, selected?.providerName || '')"
+              >查看原始数字</el-button
+            ></template
           ></el-table-column
         ><el-table-column label="换算结果"
           ><template #default="{ row }">{{

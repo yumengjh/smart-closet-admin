@@ -11,6 +11,7 @@ import {
   time,
   poolNames,
   decisions,
+  errorName,
   type Event,
   type Timeline,
   type TraceSummary,
@@ -51,37 +52,36 @@ const kinds: Record<string, string> = {
   PAUSED: "暂停",
   RESUMED: "恢复",
   MANUAL_RESUME: "手动恢复",
-  DRAINED: "手动摘除",
-  UNDRAINED: "放回",
-  REROUTE: "改道",
-  RESEND: "重发",
-  DEGRADE: "降级",
+  MANUAL_DRAIN: "手动摘除",
+  MANUAL_UNDRAIN: "放回",
+  REROUTED: "改道",
+  RESENT: "重发",
+  DEGRADED: "降级",
   UNREACHABLE: "连不上",
   REACHABLE: "恢复连通",
   LOW_BALANCE: "余额不足",
-  BALANCE_RECOVERED: "余额恢复",
+  BALANCE_OK: "余额恢复",
   CAP_REACHED: "达到上限",
   PROBE_OK: "探活成功",
   PROBE_FAILED: "探活失败",
-  NO_IMAGE_EDIT: "不支持改图"
+  EDITS_UNSUPPORTED: "不支持改图"
 };
 const execution: Record<string, string> = {
   NOT_EXECUTED: "确定没执行",
   MAYBE_EXECUTED: "可能已执行",
   REQUEST: "请求"
 };
-const errorName = (code: string | null) =>
-  !code
-    ? "—"
-    : /^PROVIDER_HTTP_(401|403)$/.test(code)
-      ? `密钥或权限（${code}）`
-      : code === "PROVIDER_HTTP_429"
-        ? `限流或额度（${code}）`
-        : code.includes("TIMEOUT")
-          ? `超时（${code}）`
-          : code.includes("CONNECTION")
-            ? `连接失败（${code}）`
-            : code;
+const scopes: Record<string, string> = {
+  ENTRY: "模型",
+  PROVIDER: "服务商",
+  POOL: "池",
+  VENDOR: "实时试穿供应商"
+};
+const outcomes: Record<string, string> = {
+  OK: "成功",
+  FAILED: "失败",
+  CANCELLED: "已取消"
+};
 const dates = () => ({ from: range.value[0], to: range.value[1] });
 const loadTimeline = () => {
   const days =
@@ -269,10 +269,10 @@ onMounted(() => {
       >
       <el-select v-model="eventScope" clearable placeholder="全部范围"
         ><el-option
-          v-for="s in ['ENTRY', 'PROVIDER', 'POOL', 'VENDOR']"
-          :key="s"
-          :label="s"
-          :value="s" /></el-select
+          v-for="(name, key) in scopes"
+          :key="key"
+          :label="name"
+          :value="key" /></el-select
       ><el-select v-model="eventPool" clearable placeholder="全部池"
         ><el-option
           v-for="(name, key) in poolNames"
@@ -301,9 +301,12 @@ onMounted(() => {
           ><template #default="{ row }">{{
             time(row.atMs)
           }}</template></el-table-column
-        ><el-table-column prop="scope" label="范围" /><el-table-column
-          prop="refId"
-          label="对象" /><el-table-column label="池"
+        ><el-table-column label="范围"
+          ><template #default="{ row }">{{
+            scopes[row.scope] || row.scope || "—"
+          }}</template></el-table-column
+        ><el-table-column prop="refId" label="对象" /><el-table-column
+          label="池"
           ><template #default="{ row }">{{
             poolNames[row.pool] || row.pool || "—"
           }}</template></el-table-column
@@ -359,8 +362,11 @@ onMounted(() => {
           ><template #default="{ row }">{{
             row.decisions.map((d: string) => decisions[d] || d).join("、")
           }}</template></el-table-column
-        ><el-table-column prop="finalOutcome" label="结果" /><el-table-column
-          label="费用"
+        ><el-table-column label="结果"
+          ><template #default="{ row }">{{
+            outcomes[row.finalOutcome] || row.finalOutcome || "—"
+          }}</template></el-table-column
+        ><el-table-column label="费用"
           ><template #default="{ row }">{{
             row.costs
               .map((c: { amountMicro: number; currency: string }) =>
@@ -400,8 +406,11 @@ onMounted(() => {
           ><template #default="{ row }">{{
             decisions[row.decision] || row.decision || "—"
           }}</template></el-table-column
-        ><el-table-column prop="outcome" label="结果" /><el-table-column
-          label="错误"
+        ><el-table-column label="结果"
+          ><template #default="{ row }">{{
+            outcomes[row.outcome] || row.outcome || "—"
+          }}</template></el-table-column
+        ><el-table-column label="错误"
           ><template #default="{ row }">{{
             errorName(row.errorCode)
           }}</template></el-table-column

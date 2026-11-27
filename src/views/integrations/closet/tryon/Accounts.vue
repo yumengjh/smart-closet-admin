@@ -43,7 +43,9 @@ const budget = ref<number>();
 const query = ref("");
 const rows = computed(() =>
   accounts.value.filter(row =>
-    `${row.name}`.toLowerCase().includes(query.value.toLowerCase())
+    `${row.name} ${row.provider_user_id ?? ""}`
+      .toLowerCase()
+      .includes(query.value.toLowerCase())
   )
 );
 const load = () =>
@@ -227,7 +229,7 @@ onMounted(() => void load());
       <el-input
         v-model="query"
         class="!w-64"
-        placeholder="搜索账户名称"
+        placeholder="搜索名称或供应商账号"
         clearable
       /><el-button :loading="loading" :disabled="saving" @click="load"
         >刷新账户</el-button
@@ -351,6 +353,9 @@ onMounted(() => void load());
       />
       <template v-if="selected">
         <el-descriptions :column="1" border class="mb-5"
+          ><el-descriptions-item label="供应商账户">{{
+            selected.provider_user_id || "—"
+          }}</el-descriptions-item
           ><el-descriptions-item label="累计授权"
             >{{ selected.budget_points }} 积分</el-descriptions-item
           ><el-descriptions-item label="当前可用"

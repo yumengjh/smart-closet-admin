@@ -59,7 +59,7 @@ export type TryOnAccount = {
   remote_active: number | null;
   remote_limit: number | null;
   environment: "china" | "global";
-  provider_user_id: string;
+  provider_user_id?: string | null;
   accepting: number;
   healthy: number;
   weight: number;

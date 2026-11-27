@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import type { EChartsOption } from "echarts";
 import type { Capability, ModelProvider } from "@/api/closet/models";
+import { poolNames } from "@/api/closet/modelInsights";
 import {
   getModelUsage,
   type ModelUsage,
@@ -17,6 +18,10 @@ const names: Record<Capability, string> = {
   VISION: "识图",
   IMAGE: "生图",
   CHAT: "对话"
+};
+const tierNames: Record<string, string> = {
+  STANDARD: "标准",
+  PREMIUM: "高质量"
 };
 const decisionNames: Record<string, string> = {
   FIRST: "首发",
@@ -306,10 +311,12 @@ onMounted(() => {
             </p>
           </div></template
         ><el-table :data="data.byPool || []" empty-text="这段时间没有模型池调用"
-          ><el-table-column prop="pool" label="池" /><el-table-column
-            prop="calls"
-            label="调用次数"
-          /><el-table-column label="费用"
+          ><el-table-column label="池"
+            ><template #default="{ row }">{{
+              poolNames[row.pool] || row.pool
+            }}</template></el-table-column
+          ><el-table-column prop="calls" label="调用次数" /><el-table-column
+            label="费用"
             ><template #default="{ row }">{{
               costs(row.costs).join("、")
             }}</template></el-table-column
@@ -327,7 +334,8 @@ onMounted(() => {
         ><el-table :data="data.byTier || []" empty-text="这段时间没有档位调用"
           ><el-table-column label="请求 → 实际"
             ><template #default="{ row }"
-              >{{ row.tierRequested }} → {{ row.tierUsed || "—" }}</template
+              >{{ tierNames[row.tierRequested] || row.tierRequested }} →
+              {{ tierNames[row.tierUsed] || row.tierUsed || "—" }}</template
             ></el-table-column
           ><el-table-column prop="calls" label="次数" /><el-table-column
             label="降级次数"
