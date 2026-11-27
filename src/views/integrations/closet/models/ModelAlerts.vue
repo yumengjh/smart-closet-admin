@@ -16,7 +16,15 @@ import ClosetUnavailable from "../ClosetUnavailable.vue";
 
 const { can } = useCurrentPermissions();
 const writable = computed(() => can("closet:models:write"));
-const { loading, unavailable, errorMessage, run } = useClosetRequest();
+// Independent sections each get their own request helper: a newer request in one section never discards another section's result.
+const rowsRequest = useClosetRequest(),
+  settingsRequest = useClosetRequest();
+const requests = [rowsRequest, settingsRequest];
+const loading = computed(() => requests.some(r => r.loading.value));
+const unavailable = computed(() => requests.some(r => r.unavailable.value));
+const errorMessage = computed(
+  () => requests.map(r => r.errorMessage.value).find(Boolean) ?? ""
+);
 const settings = ref<AlertSettings>();
 const rows = ref<Alert[]>([]);
 const firing = ref(false);
@@ -40,7 +48,7 @@ const mailNames: Record<string, string> = {
   FAILED: "发送失败"
 };
 const loadRows = () =>
-  run(
+  rowsRequest.run(
     () => getAlerts({ state: firing.value ? "FIRING" : "ALL" }),
     result => {
       rows.value = result.data.items;
@@ -48,14 +56,14 @@ const loadRows = () =>
   );
 const load = () => {
   void loadRows();
-  void run(getAlertSettings, result => {
+  void settingsRequest.run(getAlertSettings, result => {
     settings.value = result.data;
   });
 };
 const save = () => {
   if (!settings.value) return;
   const current = settings.value;
-  void run(
+  void settingsRequest.run(
     () =>
       saveAlertSettings({
         rules: Object.fromEntries(
@@ -71,7 +79,7 @@ const save = () => {
   );
 };
 const sendTest = () =>
-  void run(testAlert, result =>
+  void settingsRequest.run(testAlert, result =>
     message(mailNames[result.data.result] || result.data.result, {
       type: result.data.result === "SENT" ? "success" : "warning"
     })

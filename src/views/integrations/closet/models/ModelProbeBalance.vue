@@ -22,7 +22,15 @@ import ClosetUnavailable from "../ClosetUnavailable.vue";
 
 const { can } = useCurrentPermissions();
 const writable = computed(() => can("closet:models:write"));
-const { loading, unavailable, errorMessage, run } = useClosetRequest();
+// Independent sections each get their own request helper: a newer request in one section never discards another section's result.
+const probeRequest = useClosetRequest(),
+  balanceRequest = useClosetRequest();
+const requests = [probeRequest, balanceRequest];
+const loading = computed(() => requests.some(r => r.loading.value));
+const unavailable = computed(() => requests.some(r => r.unavailable.value));
+const errorMessage = computed(
+  () => requests.map(r => r.errorMessage.value).find(Boolean) ?? ""
+);
 const probe = ref<Probe>();
 const balances = ref<Balance[]>([]);
 const billingOpen = ref(false);
@@ -71,11 +79,11 @@ const setProbe = (value: Probe) => {
   );
 };
 const loadProbe = () =>
-  void run(getProbe, result => {
+  void probeRequest.run(getProbe, result => {
     setProbe(result.data);
   });
 const loadBalances = () =>
-  void run(getBalances, result => {
+  void balanceRequest.run(getBalances, result => {
     balances.value = result.data.providers;
   });
 const load = () => {
@@ -85,7 +93,7 @@ const load = () => {
 const saveSettings = () => {
   if (!probe.value) return;
   const current = probe.value;
-  void run(
+  void probeRequest.run(
     () =>
       saveProbe({
         ...current.settings,
@@ -104,7 +112,7 @@ const saveSettings = () => {
   );
 };
 const doProbe = (id: string) =>
-  void run(
+  void probeRequest.run(
     () => freeProbe(id),
     () => {
       message("免费探活完成", { type: "success" });
@@ -149,7 +157,7 @@ const saveSource = () => {
     autoRemove: f.autoRemove,
     ...(f.revision == null ? {} : { revision: f.revision })
   };
-  void run(
+  void balanceRequest.run(
     () => saveBilling(selected.value!.providerId, data),
     result => {
       selected.value = result.data;
@@ -163,7 +171,7 @@ const saveSource = () => {
   );
 };
 const refresh = (row: Balance) =>
-  void run(
+  void balanceRequest.run(
     () => refreshBalance(row.providerId),
     result => {
       if (result.data.lastError)
@@ -182,7 +190,7 @@ const openManual = (row: Balance) => {
 };
 const saveManual = () => {
   if (!selected.value) return;
-  void run(
+  void balanceRequest.run(
     () =>
       manualBalance(selected.value!.providerId, {
         balanceMicro: Math.round(manual.value.balance * 1000000),
@@ -199,7 +207,7 @@ const openHistory = (row: Balance) => {
   selected.value = row;
   history.value = [];
   historyOpen.value = true;
-  void run(
+  void balanceRequest.run(
     () => balanceHistory(row.providerId),
     result => {
       history.value = result.data.items;

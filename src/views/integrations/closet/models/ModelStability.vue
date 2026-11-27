@@ -20,7 +20,16 @@ import ClosetUnavailable from "../ClosetUnavailable.vue";
 import ChartView from "../insights/ChartView.vue";
 import TraceDrawer from "./TraceDrawer.vue";
 
-const { loading, unavailable, errorMessage, run } = useClosetRequest();
+// Independent sections each get their own request helper: a newer request in one section never discards another section's result.
+const modelsRequest = useClosetRequest(),
+  timelineRequest = useClosetRequest(),
+  eventsRequest = useClosetRequest(),
+  tracesRequest = useClosetRequest();
+const requests = [modelsRequest, timelineRequest, eventsRequest, tracesRequest];
+const unavailable = computed(() => requests.some(r => r.unavailable.value));
+const errorMessage = computed(
+  () => requests.map(r => r.errorMessage.value).find(Boolean) ?? ""
+);
 const today = new Date().toLocaleDateString("en-CA", {
   timeZone: "Asia/Shanghai"
 });
@@ -81,7 +90,7 @@ const loadTimeline = () => {
     message("请选择不超过 31 天的日期范围", { type: "warning" });
     return;
   }
-  void run(
+  void timelineRequest.run(
     () =>
       getTimeline({
         ...dates(),
@@ -95,7 +104,7 @@ const loadTimeline = () => {
   );
 };
 const loadEvents = () =>
-  void run(
+  void eventsRequest.run(
     () =>
       getEvents({
         ...dates(),
@@ -112,7 +121,7 @@ const loadEvents = () =>
     }
   );
 const loadTraces = () =>
-  void run(
+  void tracesRequest.run(
     () =>
       getTraces({
         ...dates(),
@@ -174,7 +183,7 @@ const chart = computed<EChartsOption>(() => {
   };
 });
 onMounted(() => {
-  void run(getModels, result => {
+  void modelsRequest.run(getModels, result => {
     entries.value = result.data.entries;
   });
   load();
