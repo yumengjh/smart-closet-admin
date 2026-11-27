@@ -17,6 +17,9 @@ export type TryOnSettingsValue = {
   storageBytes: number;
   accountConcurrency: number;
   accountGuardPoints: number;
+  premiumEnabled: boolean;
+  premiumDailySeconds: number;
+  premiumSessionSeconds: number;
 };
 export type TryOnSettings = { revision: number; value: TryOnSettingsValue };
 export type TryOnPolicy = {
@@ -38,6 +41,8 @@ export type TryOnCredentialInput = {
   name: string;
   environment: "china" | "global";
   apiKey: string;
+  vendor: "XMAX" | "DECART";
+  model?: string;
 };
 export type TryOnAccountChange = {
   name: string;
@@ -49,6 +54,10 @@ export type TryOnAccountChange = {
 export type TryOnAccount = {
   id: string;
   name: string;
+  vendor: "XMAX" | "DECART";
+  model: string | null;
+  remote_active: number | null;
+  remote_limit: number | null;
   environment: "china" | "global";
   provider_user_id: string;
   accepting: number;
@@ -73,6 +82,21 @@ export type TryOnPool = {
   availableSlots: number;
   globalRemainingPoints: number;
   accounts: TryOnAccount[];
+};
+export type TryOnVendor = {
+  vendor: "XMAX" | "DECART";
+  tier: "STANDARD" | "PREMIUM";
+  accounts: number;
+  healthyAccounts: number;
+  activeSessions: number;
+  sessionsToday: number;
+  secondsToday: number;
+  consumedPointsToday: number;
+  balancePoints: number;
+  startupFailuresToday: number;
+  authorizationFailuresToday: number;
+  remoteConcurrencyLimit?: number;
+  remoteConcurrencyActive?: number;
 };
 export type TryOnDailyUsage = {
   quota_day: string;
@@ -188,6 +212,8 @@ export const updateTryOnAccountBudget = (id: string, budgetPoints: number) =>
   );
 export const getTryOnPool = () =>
   http.request<ApiResponse<TryOnPool>>("get", `${root}/pool`);
+export const getTryOnVendors = () =>
+  http.request<ApiResponse<TryOnVendor[]>>("get", `${root}/vendors`);
 export const getTryOnReferenceSource = () =>
   http.request<ApiResponse<TryOnReferenceSource>>(
     "get",

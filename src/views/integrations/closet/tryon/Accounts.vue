@@ -30,6 +30,7 @@ const credentialAccount = ref<TryOnAccount>();
 const credential = reactive<TryOnCredentialInput>({
   name: "",
   environment: "china",
+  vendor: "XMAX",
   apiKey: ""
 });
 const form = reactive<TryOnAccountChange>({
@@ -42,7 +43,7 @@ const budget = ref<number>();
 const query = ref("");
 const rows = computed(() =>
   accounts.value.filter(row =>
-    `${row.name} ${row.provider_user_id}`
+    `${row.name}`
       .toLowerCase()
       .includes(query.value.toLowerCase())
   )
@@ -77,24 +78,29 @@ const openCredential = (account?: TryOnAccount) => {
   Object.assign(credential, {
     name: account?.name ?? "",
     environment: account?.environment ?? "china",
+    vendor: account?.vendor ?? "XMAX",
+    model: account?.model ?? "",
     apiKey: ""
   });
   credentialOpen.value = true;
 };
 const clearCredential = () => {
-  Object.assign(credential, { name: "", environment: "china", apiKey: "" });
+  Object.assign(credential, { name: "", environment: "china", vendor: "XMAX", model: "", apiKey: "" });
   credentialAccount.value = undefined;
 };
 const credentialValid = computed(
   () =>
     credential.name.trim().length > 0 &&
     credential.name.length <= 80 &&
-    /^uk-[A-Za-z0-9_-]{8,500}$/.test(credential.apiKey)
+    (credential.vendor === "DECART"
+      ? /^[A-Za-z0-9_.-]{16,500}$/.test(credential.apiKey) &&
+        (!credential.model || /^[A-Za-z0-9._-]{1,80}$/.test(credential.model))
+      : /^uk-[A-Za-z0-9_-]{8,500}$/.test(credential.apiKey))
 );
 const saveCredential = async () => {
   if (!credentialValid.value) return;
   const account = credentialAccount.value;
-  const data = { ...credential };
+  const data = { ...credential, model: credential.vendor === "DECART" && credential.model ? credential.model : undefined };
   const result = await act(
     "credentials",
     account ? "轮换账户凭证" : "登记运营账户",
@@ -211,7 +217,7 @@ onMounted(() => void load());
       <el-input
         v-model="query"
         class="!w-64"
-        placeholder="搜索名称或供应商账号"
+        placeholder="搜索账户名称"
         clearable
       /><el-button :loading="loading" :disabled="saving" @click="load"
         >刷新账户</el-button
@@ -243,6 +249,15 @@ onMounted(() => void load());
       empty-text="暂无运营账户，可登记供应商账户后配置支出授权"
     >
       <el-table-column prop="name" label="账户名称" min-width="150" />
+      <el-table-column label="供应商" min-width="160">
+        <template #default="{ row }">{{ row.vendor === "DECART" ? "高质量 · decart" : "标准 · XMax" }}</template>
+      </el-table-column>
+      <el-table-column label="高质量模型" min-width="150">
+        <template #default="{ row }">{{ row.vendor === "DECART" ? (row.model || "默认模型") : "—" }}</template>
+      </el-table-column>
+      <el-table-column label="供应商在用连接 / 上限" min-width="180">
+        <template #default="{ row }">{{ row.vendor === "DECART" ? `${row.remote_active ?? "—"} / ${row.remote_limit ?? "—"}` : "—" }}</template>
+      </el-table-column>
       <el-table-column label="环境" min-width="90"
         ><template #default="{ row }">{{
           row.environment === "china" ? "国内" : "海外"
@@ -318,9 +333,6 @@ onMounted(() => void load());
       />
       <template v-if="selected">
         <el-descriptions :column="1" border class="mb-5"
-          ><el-descriptions-item label="供应商账户">{{
-            selected.provider_user_id
-          }}</el-descriptions-item
           ><el-descriptions-item label="累计授权"
             >{{ selected.budget_points }} 积分</el-descriptions-item
           ><el-descriptions-item label="当前可用"
@@ -464,11 +476,20 @@ onMounted(() => void load());
             v-model="credential.name"
             maxlength="80"
             autocomplete="off" /></el-form-item
+        ><el-form-item label="供应商" required>
+          <el-select v-model="credential.vendor" class="w-full" :disabled="!!credentialAccount" @change="credential.environment = credential.vendor === 'DECART' ? 'global' : 'china'">
+            <el-option label="标准 · XMax" value="XMAX" />
+            <el-option label="高质量 · decart" value="DECART" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="credential.vendor === 'DECART'" label="模型（留空使用默认模型）">
+          <el-input v-model="credential.model" maxlength="80" placeholder="lucy-vton-latest" />
+        </el-form-item
         ><el-form-item label="供应商环境" required
           ><el-select
             v-model="credential.environment"
             class="w-full"
-            :disabled="!!credentialAccount"
+            :disabled="!!credentialAccount || credential.vendor === 'DECART'"
             ><el-option label="国内" value="china" /><el-option
               label="海外"
               value="global" /></el-select></el-form-item
@@ -477,7 +498,7 @@ onMounted(() => void load());
             v-model="credential.apiKey"
             type="password"
             autocomplete="new-password"
-            placeholder="uk- 开头的供应商密钥"
+            :placeholder="credential.vendor === 'XMAX' ? 'uk- 开头的供应商密钥' : '供应商永久密钥'"
             maxlength="503" /></el-form-item
       ></el-form>
       <template #footer
