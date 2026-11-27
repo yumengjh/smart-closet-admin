@@ -111,6 +111,7 @@ export type Balance = {
 export type AlertSettings = {
   rules: { rule: string; name: string; trigger: string; enabled: boolean }[];
   repeatMinutes: number;
+  sendMail: boolean;
   mailEnabled: boolean;
   recipientsConfigured: boolean;
   revision: number;
@@ -161,6 +162,7 @@ export const getAlertSettings = () => get<AlertSettings>("/alerts/settings");
 export const saveAlertSettings = (data: {
   rules: Record<string, boolean>;
   repeatMinutes: number;
+  sendMail: boolean;
   revision: number;
 }) => put<AlertSettings>("/alerts/settings", data);
 export const testAlert = () => post<{ result: string }>("/alerts/test");

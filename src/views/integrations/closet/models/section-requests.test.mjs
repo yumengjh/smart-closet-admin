@@ -111,3 +111,37 @@ test("探活与余额页同时读探活和余额，两块都显示", async () =>
   assert.equal(c.balances.value.length, 1);
   assert.equal(c.probe.value.revision, 3);
 });
+
+test("告警邮件开关一拨就保存，请求里带 sendMail 和原有设置", async () => {
+  const saved = [];
+  const c = await mount("ModelAlerts.vue", "load, settings, toggleMail", {
+    getAlerts: async () => ({ data: { firingCount: 0, items: [] } }),
+    getAlertSettings: async () => ({
+      data: {
+        rules: [{ rule: "pool-exhausted", enabled: true }],
+        repeatMinutes: 60,
+        sendMail: true,
+        revision: 4
+      }
+    }),
+    saveAlertSettings: async body => {
+      saved.push(body);
+      return { data: { ...body, rules: [], revision: 5 } };
+    },
+    time: () => ""
+  });
+  c.load();
+  await flush();
+  c.settings.value.sendMail = false;
+  c.toggleMail();
+  await flush();
+  assert.deepEqual(JSON.parse(JSON.stringify(saved)), [
+    {
+      rules: { "pool-exhausted": true },
+      repeatMinutes: 60,
+      sendMail: false,
+      revision: 4
+    }
+  ]);
+  assert.equal(c.settings.value.revision, 5);
+});

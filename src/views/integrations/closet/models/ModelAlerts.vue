@@ -43,6 +43,7 @@ const names: Record<string, string> = {
 const mailNames: Record<string, string> = {
   SENT: "已发送",
   THROTTLED: "节流",
+  MAIL_OFF: "告警邮件已关闭",
   MAIL_DISABLED: "邮件未开启",
   NO_RECIPIENT: "没有收件人",
   FAILED: "发送失败"
@@ -60,7 +61,7 @@ const load = () => {
     settings.value = result.data;
   });
 };
-const save = () => {
+const save = (done = "告警设置已保存") => {
   if (!settings.value) return;
   const current = settings.value;
   void settingsRequest.run(
@@ -70,14 +71,22 @@ const save = () => {
           current.rules.map(rule => [rule.rule, rule.enabled])
         ),
         repeatMinutes: current.repeatMinutes,
+        sendMail: current.sendMail,
         revision: current.revision
       }),
     result => {
       settings.value = result.data;
-      message("告警设置已保存", { type: "success" });
+      message(done, { type: "success" });
     }
   );
 };
+// The one switch that silences alert mail; it saves as soon as it is flipped.
+const toggleMail = () =>
+  save(
+    settings.value?.sendMail
+      ? "已开启告警邮件"
+      : "已关闭告警邮件，告警只在这里记录"
+  );
 const sendTest = () =>
   void settingsRequest.run(testAlert, result =>
     message(mailNames[result.data.result] || result.data.result, {
@@ -113,6 +122,17 @@ onMounted(load);
           >
         </div></template
       >
+      <div class="flex items-center gap-3 mb-2">
+        <span>发送告警邮件</span>
+        <el-switch
+          v-model="settings.sendMail"
+          :disabled="!writable || loading"
+          @change="toggleMail"
+        />
+        <span class="text-xs text-gray-500">
+          关闭后告警照常在这里记录，只是不发邮件；测试邮件不受影响。
+        </span>
+      </div>
       邮件模块：{{ settings.mailEnabled ? "已开启" : "未开启" }}；收件人：{{
         settings.recipientsConfigured ? "已配置" : "未配置"
       }}
@@ -162,7 +182,7 @@ onMounted(load);
             v-if="writable"
             type="primary"
             :loading="loading"
-            @click="save"
+            @click="save()"
             >保存</el-button
           >
         </div></template
