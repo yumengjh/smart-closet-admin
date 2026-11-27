@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import type { EChartsOption } from "echarts";
 import type { Capability, ModelProvider } from "@/api/closet/models";
+import { poolNames } from "@/api/closet/modelInsights";
 import {
   getModelUsage,
   type ModelUsage,
@@ -11,12 +12,24 @@ import { message } from "@/utils/message";
 import ChartView from "../insights/ChartView.vue";
 import ClosetUnavailable from "../ClosetUnavailable.vue";
 import { formatTime, percent, useClosetRequest } from "../useClosetRequest";
+import TraceDrawer from "./TraceDrawer.vue";
 
 const props = defineProps<{ providers: ModelProvider[] }>();
+const traceDrawer = ref<InstanceType<typeof TraceDrawer>>();
 const names: Record<Capability, string> = {
   VISION: "识图",
   IMAGE: "生图",
   CHAT: "对话"
+};
+const tierNames: Record<string, string> = {
+  STANDARD: "标准",
+  PREMIUM: "高质量"
+};
+const decisionNames: Record<string, string> = {
+  FIRST: "首发",
+  REROUTE: "改道",
+  RESEND: "重发",
+  DEGRADE: "降级"
 };
 const purposes: Record<string, string> = {
   RECOGNIZE: "识别衣物",
@@ -291,6 +304,92 @@ onMounted(() => {
           > </el-table
         ><el-empty v-else description="这段时间没有调用记录" />
       </el-card>
+      <el-card
+        ><template #header
+          ><div>
+            <h2 class="text-base">按池</h2>
+            <p class="text-xs text-gray-500">
+              查看各模型池的调用次数和费用；没有调用时为空。
+            </p>
+          </div></template
+        ><el-table :data="data.byPool || []" empty-text="这段时间没有模型池调用"
+          ><el-table-column label="池"
+            ><template #default="{ row }">{{
+              poolNames[row.pool] || row.pool
+            }}</template></el-table-column
+          ><el-table-column prop="calls" label="调用次数" /><el-table-column
+            label="费用"
+            ><template #default="{ row }">{{
+              costs(row.costs).join("、")
+            }}</template></el-table-column
+          ></el-table
+        ></el-card
+      >
+      <el-card
+        ><template #header
+          ><div>
+            <h2 class="text-base">按档位</h2>
+            <p class="text-xs text-gray-500">
+              请求档位与实际档位不同的调用为降级。
+            </p>
+          </div></template
+        ><el-table :data="data.byTier || []" empty-text="这段时间没有档位调用"
+          ><el-table-column label="请求 → 实际"
+            ><template #default="{ row }"
+              >{{ tierNames[row.tierRequested] || row.tierRequested }} →
+              {{ tierNames[row.tierUsed] || row.tierUsed || "—" }}</template
+            ></el-table-column
+          ><el-table-column prop="calls" label="次数" /><el-table-column
+            label="降级次数"
+            ><template #default="{ row }">{{
+              row.degraded ? row.calls : 0
+            }}</template></el-table-column
+          ><el-table-column label="费用"
+            ><template #default="{ row }">{{
+              costs(row.costs).join("、")
+            }}</template></el-table-column
+          ></el-table
+        ></el-card
+      >
+      <el-card
+        ><template #header
+          ><div>
+            <h2 class="text-base">调用决定</h2>
+            <p class="text-xs text-gray-500">
+              查看首发、改道、重发和降级的次数与花费。
+            </p>
+          </div></template
+        ><el-table
+          :data="data.decisions || []"
+          empty-text="这段时间没有调用决定"
+          ><el-table-column label="决定"
+            ><template #default="{ row }">{{
+              decisionNames[row.decision] || row.decision
+            }}</template></el-table-column
+          ><el-table-column prop="calls" label="次数" /><el-table-column
+            label="费用"
+            ><template #default="{ row }">{{
+              costs(row.costs).join("、")
+            }}</template></el-table-column
+          ></el-table
+        ></el-card
+      >
+      <el-card
+        ><template #header
+          ><div>
+            <h2 class="text-base">探活花费</h2>
+            <p class="text-xs text-gray-500">
+              免费和付费探活分别统计；未调用时为零。
+            </p>
+          </div></template
+        >
+        <div v-for="kind in ['free', 'paid'] as const" :key="kind">
+          {{ kind === "free" ? "免费" : "付费" }}：{{
+            data.probe?.[kind]?.calls || 0
+          }}
+          次，{{ costs(data.probe?.[kind]?.costs || []).join("、") }}
+        </div></el-card
+      >
       <el-card>
         <template #header
           ><div>
@@ -321,6 +420,16 @@ onMounted(() => {
                 >{{ percent(row.successRate) }}</span
               ></template
             ></el-table-column
+          >
+          <el-table-column label="确定没执行失败率" min-width="150"
+            ><template #default="{ row }">{{
+              percent(row.notExecutedRate)
+            }}</template></el-table-column
+          >
+          <el-table-column label="可能已执行失败率" min-width="150"
+            ><template #default="{ row }">{{
+              percent(row.maybeExecutedRate)
+            }}</template></el-table-column
           >
           <el-table-column label="平均耗时" min-width="100"
             ><template #default="{ row }">{{
@@ -436,6 +545,18 @@ onMounted(() => {
           </div></template
         >
         <el-table v-if="data.recent.length" :data="data.recent">
+          <el-table-column label="尝试链" min-width="100">
+            <template #default="{ row }">
+              <el-button
+                v-if="row.traceId"
+                link
+                type="primary"
+                @click="traceDrawer?.open(row.traceId)"
+                >{{ row.traceId.slice(0, 8) }}</el-button
+              >
+              <span v-else>—</span>
+            </template>
+          </el-table-column>
           <el-table-column label="时间" min-width="170"
             ><template #default="{ row }">{{
               formatTime(row.atMs)
@@ -498,6 +619,7 @@ onMounted(() => {
         ><el-empty v-else description="这段时间没有调用记录" />
       </el-card>
     </template>
+    <TraceDrawer ref="traceDrawer" />
   </div>
 </template>
 

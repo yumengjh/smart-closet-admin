@@ -14,7 +14,10 @@ const { loading, unavailable, errorMessage, run } = useClosetRequest();
 const { can, saving, actionError, act } = useTryOnAction();
 const snapshot = ref<TryOnSettings>();
 const form = ref<TryOnSettingsValue>();
-type NumericKey = Exclude<keyof TryOnSettingsValue, "mode" | "defaultEnabled">;
+type NumericKey = Exclude<
+  keyof TryOnSettingsValue,
+  "mode" | "defaultEnabled" | "premiumEnabled"
+>;
 const groups: Array<{
   title: string;
   fields: Array<{ key: NumericKey; label: string; min: number; max: number }>;
@@ -78,6 +81,18 @@ const groups: Array<{
         key: "accountGuardPoints",
         label: "账户保护余量（积分）",
         min: 0,
+        max: 3600
+      }
+    ]
+  },
+  {
+    title: "高质量",
+    fields: [
+      { key: "premiumDailySeconds", label: "每日免费秒数", min: 0, max: 86400 },
+      {
+        key: "premiumSessionSeconds",
+        label: "单次上限（秒）",
+        min: 10,
         max: 3600
       }
     ]
@@ -179,6 +194,14 @@ onMounted(() => void load());
       </p>
       <section v-for="group in groups" :key="group.title" class="mb-5">
         <h4 class="mb-3 font-medium">{{ group.title }}</h4>
+        <template v-if="group.title === '高质量'">
+          <p class="mb-3 text-xs text-[var(--el-text-color-secondary)]">
+            高质量约为标准成本的 25 倍；开启前请确认供应商数据条款与网络可达性。
+          </p>
+          <el-form-item label="开启高质量"
+            ><el-switch v-model="form.premiumEnabled"
+          /></el-form-item>
+        </template>
         <div class="grid gap-x-6 md:grid-cols-2 xl:grid-cols-3">
           <el-form-item
             v-for="field in group.fields"

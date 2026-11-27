@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRoute } from "vue-router";
 import { ElMessageBox } from "element-plus";
 import { message } from "@/utils/message";
 import { useCurrentPermissions } from "@/composables/useCurrentPermissions";
@@ -9,14 +10,12 @@ import {
   createProvider,
   deleteEntry,
   deleteProvider,
-  deleteRouting,
   editEntry,
   editProvider,
   getModels,
   probeProvider,
   putEntryReferences,
   putEntryTimeout,
-  putRouting,
   resumeEntry,
   testEntry,
   type Capability,
@@ -26,34 +25,29 @@ import {
   type ModelProtocol,
   type ModelProvider,
   type ProviderKind,
-  type ReferenceOverLimit,
-  type RoutingSlot
+  type ReferenceOverLimit
 } from "@/api/closet/models";
 import ClosetUnavailable from "../ClosetUnavailable.vue";
 import { formatTime, useClosetRequest } from "../useClosetRequest";
 import ModelUsage from "./ModelUsage.vue";
+import ModelStability from "./ModelStability.vue";
+import ModelProbeBalance from "./ModelProbeBalance.vue";
+import ModelAlerts from "./ModelAlerts.vue";
+import ModelPoolConfig from "./ModelPoolConfig.vue";
+import { http } from "@/utils/http";
+import type { ApiResponse } from "@/api/user";
 
 defineOptions({ name: "ClosetModels" });
+const route = useRoute();
 const { can } = useCurrentPermissions();
 const writable = computed(() => can("closet:models:write"));
 const { loading, unavailable, errorMessage, run } = useClosetRequest();
 const overview = ref<ModelOverview>();
 const capabilities: Capability[] = ["VISION", "IMAGE", "CHAT"];
-const routingSlots: RoutingSlot[] = [...capabilities, "PORTRAIT"];
 const capabilityNames: Record<Capability, string> = {
   VISION: "识图",
   IMAGE: "生图",
   CHAT: "对话"
-};
-const routingNames: Record<RoutingSlot, string> = {
-  ...capabilityNames,
-  PORTRAIT: "形象图"
-};
-const descriptions: Record<RoutingSlot, string> = {
-  VISION: "识图用于衣物识别、整套样本和穿搭收藏拆解。",
-  IMAGE: "生图用于整理衣物照、上身图和创作。",
-  CHAT: "对话用于鱼搭助手。",
-  PORTRAIT: "生成‘我的形象’底图时用的模型。不单独选就跟随生图。"
 };
 const statusNames = {
   READY: "正常",
@@ -67,28 +61,39 @@ const eventNames = {
   REROUTED: "改用备用",
   MANUAL_RESUME: "手动恢复"
 };
-const routingForms = reactive<
-  Record<RoutingSlot, { active: string; fallback: string | null }>
->({
-  VISION: { active: "", fallback: null },
-  IMAGE: { active: "", fallback: null },
-  CHAT: { active: "", fallback: null },
-  PORTRAIT: { active: "", fallback: null }
-});
 const tab = ref<Capability>("VISION");
-const pageTab = ref("config");
+const pageTab = ref(
+  ["config", "stability", "probe", "alerts", "usage"].includes(
+    String(route.query.tab)
+  )
+    ? String(route.query.tab)
+    : "config"
+);
 const busy = ref(false);
-const load = () =>
-  run(getModels, ({ data }) => {
+const balanceSources = ref<Record<string, string>>({});
+const load = async () => {
+  await run(getModels, ({ data }) => {
     overview.value = data;
-    for (const capability of routingSlots) {
-      const routing = data.routing[capability];
-      routingForms[capability] = {
-        active: routing?.active ?? "",
-        fallback: routing?.fallback ?? null
-      };
-    }
   });
+  try {
+    const result = await http.request<
+      ApiResponse<{
+        providers: { providerId: string; billing: { source: string } }[];
+      }>
+    >("get", "/closet/models/balances");
+    balanceSources.value = Object.fromEntries(
+      result.data.providers.map(item => [item.providerId, item.billing.source])
+    );
+  } catch {
+    balanceSources.value = {};
+  }
+};
+const balanceSourceNames: Record<string, string> = {
+  NONE: "未配置",
+  NEWAPI: "NewAPI / OneAPI",
+  OPENROUTER: "OpenRouter",
+  MANUAL: "手动录入"
+};
 const providerName = (id: string) =>
   overview.value?.providers.find(item => item.id === id)?.name ?? id;
 const entryName = (id?: string | null) => {
@@ -97,16 +102,6 @@ const entryName = (id?: string | null) => {
     ? `${entry.label || entry.model} · ${providerName(entry.providerId)}`
     : id || "—";
 };
-const eligible = (capability: RoutingSlot) =>
-  overview.value?.entries.filter(
-    entry =>
-      entry.capability === (capability === "PORTRAIT" ? "IMAGE" : capability) &&
-      entry.enabled &&
-      overview.value?.providers.some(
-        provider =>
-          provider.id === entry.providerId && provider.status === "READY"
-      )
-  ) ?? [];
 const healthText = (health?: ModelHealth) => {
   if (!health) return "—";
   const state =
@@ -164,40 +159,6 @@ const confirm = async (text: string, title: string) => {
     return false;
   }
 };
-const saveRouting = async (capability: RoutingSlot) => {
-  const form = routingForms[capability];
-  if (!form.active || form.active === form.fallback) {
-    message("请选择不同的生效模型和备用模型", { type: "warning" });
-    return;
-  }
-  await mutate(() =>
-    putRouting(capability, {
-      active: form.active,
-      fallback: form.fallback || null,
-      revision: overview.value?.routing[capability]?.revision ?? 0
-    })
-  );
-};
-const followImage = async (value: string) => {
-  if (value) return;
-  if (overview.value?.routing.PORTRAIT?.followsImage) {
-    routingForms.PORTRAIT.fallback = null;
-    return;
-  }
-  if (!(await mutate(() => deleteRouting("PORTRAIT")))) {
-    routingForms.PORTRAIT.active =
-      overview.value?.routing.PORTRAIT?.active ?? "";
-  }
-};
-const resetRouting = async (capability: Capability) => {
-  if (
-    await confirm(
-      "将改回部署配置里的默认模型，并清除备用设置。",
-      "恢复部署默认"
-    )
-  )
-    await mutate(() => deleteRouting(capability));
-};
 const probe = async (id: string, suggestions = false) => {
   try {
     const { data } = await probeProvider(id);
@@ -223,10 +184,7 @@ const removeEntry = async (row: ModelEntry) => {
 const tryEntry = async (row: ModelEntry) => {
   if (row.capability === "IMAGE") return;
   if (
-    !(await confirm(
-      "会向上游发一次真实请求，可能产生少量费用，并计入全站模型预算。",
-      "试一次"
-    ))
+    !(await confirm("会产生一次真实调用费用，并计入全站模型预算。", "试一次"))
   )
     return;
   try {
@@ -383,6 +341,12 @@ const addRejectedHosts = (row: ModelProvider) => {
 const applyPreset = (value: string) => {
   if (!value) return;
   providerForm.kind = "OPENAI_COMPATIBLE";
+  if (value === "openrouter") {
+    providerForm.baseUrl = "https://openrouter.ai/api/v1";
+    providerForm.timeoutSeconds = 180;
+    providerForm.imageHosts = [];
+    return;
+  }
   providerForm.baseUrl =
     value === "sg"
       ? "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
@@ -462,6 +426,9 @@ const entryForm = reactive<{
   maxReferenceImages: number | undefined;
   overLimit: ReferenceOverLimit;
   defaults: string;
+  deployment: string;
+  apiVersion: string;
+  supportsEdits: boolean;
 }>({
   capability: "VISION",
   providerId: "",
@@ -477,23 +444,29 @@ const entryForm = reactive<{
   extraParams: "",
   maxReferenceImages: undefined,
   overLimit: "STITCH",
-  defaults: ""
+  defaults: "",
+  deployment: "",
+  apiVersion: "2025-04-01-preview",
+  supportsEdits: true
 });
 const protocols = computed<ModelProtocol[]>(() => {
   const kind = overview.value?.providers.find(
     p => p.id === entryForm.providerId
   )?.kind;
+  if (kind === "AZURE_OPENAI")
+    return entryForm.capability === "IMAGE" ? ["OPENAI_IMAGES"] : [];
   if (kind === "GEMINI")
     return entryForm.capability === "CHAT" ? [] : ["GEMINI"];
   if (entryForm.capability === "VISION" || entryForm.capability === "CHAT")
     return ["OPENAI_CHAT"];
-  return ["OPENAI_IMAGES", "DASHSCOPE_IMAGE"];
+  return ["OPENAI_IMAGES", "OPENROUTER_IMAGES", "DASHSCOPE_IMAGE"];
 });
 const protocolNames: Record<ModelProtocol, string> = {
   OPENAI_CHAT: "OpenAI Chat",
   OPENAI_IMAGES: "OpenAI Images",
   GEMINI: "Gemini",
-  DASHSCOPE_IMAGE: "百炼 Qwen-Image"
+  DASHSCOPE_IMAGE: "百炼 Qwen-Image",
+  OPENROUTER_IMAGES: "OpenRouter 生图"
 };
 const updateProtocol = () => {
   if (!protocols.value.includes(entryForm.protocol))
@@ -520,7 +493,10 @@ const openEntry = (row?: ModelEntry) => {
       : "",
     maxReferenceImages: options.maxReferenceImages ?? undefined,
     overLimit: options.overLimit ?? "STITCH",
-    defaults: options.defaults ? JSON.stringify(options.defaults, null, 2) : ""
+    defaults: options.defaults ? JSON.stringify(options.defaults, null, 2) : "",
+    deployment: options.deployment ?? "",
+    apiVersion: options.apiVersion ?? "2025-04-01-preview",
+    supportsEdits: options.supportsEdits !== false
   });
   if (!row) updateProtocol();
   entryOpen.value = true;
@@ -539,6 +515,14 @@ const saveEntry = async () => {
     !protocols.value.includes(entryForm.protocol)
   ) {
     message("请填写服务商、协议和模型名", { type: "warning" });
+    return;
+  }
+  if (
+    overview.value?.providers.find(p => p.id === entryForm.providerId)?.kind ===
+      "AZURE_OPENAI" &&
+    !entryForm.deployment.trim()
+  ) {
+    message("请填写 Azure deployment", { type: "warning" });
     return;
   }
   let extra: Record<string, unknown> | undefined,
@@ -566,6 +550,14 @@ const saveEntry = async () => {
     else delete options.extraParams;
   }
   if (entryForm.capability === "IMAGE") {
+    options.supportsEdits = entryForm.supportsEdits;
+    if (
+      overview.value?.providers.find(p => p.id === entryForm.providerId)
+        ?.kind === "AZURE_OPENAI"
+    ) {
+      options.deployment = entryForm.deployment.trim();
+      options.apiVersion = entryForm.apiVersion.trim() || "2025-04-01-preview";
+    }
     if (entryForm.maxReferenceImages != null)
       options.maxReferenceImages = entryForm.maxReferenceImages;
     else delete options.maxReferenceImages;
@@ -622,6 +614,15 @@ onMounted(() => {
       :closable="false"
     />
     <template v-if="overview && !unavailable">
+      <el-alert
+        v-if="(overview.alerts?.firing ?? 0) > 0"
+        :title="`有 ${overview.alerts?.firing} 条告警还没恢复`"
+        type="error"
+        show-icon
+        :closable="false"
+        class="mb-4"
+        @click="pageTab = 'alerts'"
+      />
       <el-tabs v-model="pageTab">
         <el-tab-pane label="配置" name="config" class="space-y-4">
           <el-alert
@@ -638,134 +639,11 @@ onMounted(() => {
             :closable="false"
             show-icon
           />
-          <el-card>
-            <template #header
-              ><div>
-                <h2 class="text-base">正在使用</h2>
-                <p class="text-xs text-gray-500">
-                  新任务立即使用这里选的模型；已经排队的任务继续用提交时的模型。生效模型连续失败
-                  3 次会暂停 10
-                  分钟，期间新任务和排队中的整理、识图任务改用备用，到期自动试回；上身图和创作不改用备用。上身图和创作跟随生图。
-                </p>
-              </div></template
-            >
-            <div class="routing-grid">
-              <div
-                v-for="capability in routingSlots"
-                :key="capability"
-                class="space-y-3"
-              >
-                <h3 class="font-medium">{{ routingNames[capability] }}</h3>
-                <p class="text-xs text-gray-500">
-                  {{ descriptions[capability] }}
-                </p>
-                <div>
-                  生效模型
-                  <el-select
-                    v-model="routingForms[capability].active"
-                    class="w-full"
-                    :disabled="!writable || busy"
-                    placeholder="请选择"
-                    @change="capability === 'PORTRAIT' && followImage($event)"
-                    ><el-option
-                      v-if="capability === 'PORTRAIT'"
-                      value=""
-                      label="跟随生图" /><el-option
-                      v-for="entry in eligible(capability)"
-                      :key="entry.id"
-                      :value="entry.id"
-                      :label="entryName(entry.id)"
-                  /></el-select>
-                </div>
-                <div>
-                  备用模型
-                  <el-select
-                    v-model="routingForms[capability].fallback"
-                    class="w-full"
-                    :disabled="
-                      !writable ||
-                      busy ||
-                      (capability === 'PORTRAIT' &&
-                        !routingForms.PORTRAIT.active)
-                    "
-                    clearable
-                    placeholder="不设备用"
-                    ><el-option
-                      v-for="entry in eligible(capability)"
-                      :key="entry.id"
-                      :value="entry.id"
-                      :label="entryName(entry.id)"
-                      :disabled="entry.id === routingForms[capability].active"
-                  /></el-select>
-                </div>
-                <div>
-                  实际在用：<template
-                    v-if="
-                      capability === 'PORTRAIT' &&
-                      overview.routing.PORTRAIT?.followsImage
-                    "
-                    >跟随生图：</template
-                  >{{
-                    entryName(
-                      capability === "PORTRAIT" &&
-                        overview.routing.PORTRAIT?.followsImage
-                        ? overview.routing.IMAGE?.effective
-                        : overview.routing[capability]?.effective
-                    )
-                  }}
-                  <el-tag
-                    v-if="
-                      !(
-                        capability === 'PORTRAIT' &&
-                        overview.routing.PORTRAIT?.followsImage
-                      ) &&
-                      overview.routing[capability]?.effective &&
-                      overview.routing[capability]?.effective !==
-                        overview.routing[capability]?.active
-                    "
-                    type="warning"
-                    >已切到备用</el-tag
-                  >
-                </div>
-                <div>
-                  健康：{{
-                    healthText(
-                      overview.entries.find(
-                        entry =>
-                          entry.id ===
-                          (capability === "PORTRAIT" &&
-                          overview.routing.PORTRAIT?.followsImage
-                            ? overview.routing.IMAGE?.active
-                            : overview.routing[capability]?.active)
-                      )?.health
-                    )
-                  }}
-                </div>
-                <div>
-                  <el-button
-                    type="primary"
-                    :disabled="
-                      !writable ||
-                      busy ||
-                      (capability === 'PORTRAIT' &&
-                        !routingForms.PORTRAIT.active)
-                    "
-                    @click="saveRouting(capability)"
-                    >保存</el-button
-                  ><el-button
-                    v-if="capability !== 'PORTRAIT'"
-                    :disabled="
-                      !writable ||
-                      busy ||
-                      !overview.routing[capability]?.configured
-                    "
-                    @click="resetRouting(capability)"
-                    >恢复部署默认</el-button
-                  >
-                </div>
-              </div>
-            </div>
-          </el-card>
+          <ModelPoolConfig
+            :overview="overview"
+            :writable="writable"
+            @refresh="load"
+          />
           <el-card>
             <template #header
               ><div class="card-heading">
@@ -818,7 +696,11 @@ onMounted(() => {
               >
               <el-table-column label="类型" width="120"
                 ><template #default="{ row }">{{
-                  row.kind === "GEMINI" ? "Gemini" : "OpenAI 兼容"
+                  row.kind === "GEMINI"
+                    ? "Gemini"
+                    : row.kind === "AZURE_OPENAI"
+                      ? "Azure OpenAI"
+                      : "OpenAI 兼容"
                 }}</template></el-table-column
               >
               <el-table-column
@@ -827,6 +709,11 @@ onMounted(() => {
                 min-width="190"
                 show-overflow-tooltip
               />
+              <el-table-column label="余额来源" min-width="130"
+                ><template #default="{ row }">{{
+                  balanceSourceNames[balanceSources[row.id]] || "未获取"
+                }}</template></el-table-column
+              >
               <el-table-column label="可信图片域名" min-width="160">
                 <template #default="{ row }">
                   <el-tag v-if="row.anyPublicImageHost" type="warning"
@@ -1106,6 +993,15 @@ onMounted(() => {
             </el-table>
           </el-card>
         </el-tab-pane>
+        <el-tab-pane label="稳定性" name="stability" lazy
+          ><ModelStability
+        /></el-tab-pane>
+        <el-tab-pane label="探活与余额" name="probe" lazy
+          ><ModelProbeBalance
+        /></el-tab-pane>
+        <el-tab-pane label="告警" name="alerts" lazy
+          ><ModelAlerts
+        /></el-tab-pane>
         <el-tab-pane label="调用与消耗" name="usage" lazy>
           <ModelUsage :providers="overview.providers" />
         </el-tab-pane>
@@ -1122,7 +1018,9 @@ onMounted(() => {
           ><el-select v-model="preset" @change="applyPreset"
             ><el-option label="不使用预设" value="" /><el-option
               label="阿里云百炼（北京）"
-              value="bj" /><el-option label="阿里云百炼（新加坡）" value="sg"
+              value="bj" /><el-option
+              label="阿里云百炼（新加坡）"
+              value="sg" /><el-option label="OpenRouter" value="openrouter"
           /></el-select>
           <p class="help">北京和新加坡的密钥不通用。</p></el-form-item
         >
@@ -1142,7 +1040,9 @@ onMounted(() => {
               label="OpenAI 兼容"
               value="OPENAI_COMPATIBLE" /><el-option
               label="Gemini"
-              value="GEMINI" /></el-select
+              value="GEMINI" /><el-option
+              label="Azure OpenAI"
+              value="AZURE_OPENAI" /></el-select
         ></el-form-item>
         <el-form-item label="地址"
           ><el-input v-model="providerForm.baseUrl" /></el-form-item
@@ -1271,6 +1171,19 @@ onMounted(() => {
             https://dashscope.aliyuncs.com/api/v1
           </p></el-form-item
         >
+        <template
+          v-if="
+            overview?.providers.find(p => p.id === entryForm.providerId)
+              ?.kind === 'AZURE_OPENAI'
+          "
+        >
+          <el-form-item label="Deployment"
+            ><el-input v-model="entryForm.deployment"
+          /></el-form-item>
+          <el-form-item label="API Version"
+            ><el-input v-model="entryForm.apiVersion"
+          /></el-form-item>
+        </template>
         <template v-if="entryForm.protocol === 'OPENAI_CHAT'"
           ><template v-if="entryForm.capability === 'VISION'"
             ><el-form-item label="输出方式"
@@ -1313,6 +1226,11 @@ onMounted(() => {
           /></el-form-item>
         </template>
         <template v-if="entryForm.capability === 'IMAGE'"
+          ><el-form-item label="支持改图"
+            ><el-switch v-model="entryForm.supportsEdits" />
+            <p class="help">
+              关闭后这个模型只接没有参考图的任务；某些中转不支持改图接口。
+            </p></el-form-item
           ><el-form-item label="参考图上限"
             ><el-input-number
               v-model="entryForm.maxReferenceImages"

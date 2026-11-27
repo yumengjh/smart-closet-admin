@@ -4,6 +4,8 @@ import {
   getTryOnPool,
   getTryOnUsage,
   getTryOnReferenceSource,
+  getTryOnVendors,
+  type TryOnVendor,
   type TryOnPool,
   type TryOnDailyUsage,
   type TryOnReferenceSource
@@ -14,6 +16,7 @@ const { loading, unavailable, errorMessage, run } = useClosetRequest();
 const pool = ref<TryOnPool>();
 const source = ref<TryOnReferenceSource>();
 const usage = ref<TryOnDailyUsage[]>([]);
+const vendors = ref<TryOnVendor[]>([]);
 const sourceNames = {
   NONE: "未配置",
   BUCKET: "试穿专用存储桶",
@@ -29,11 +32,17 @@ const referenceNames: Record<string, string> = {
 const load = () =>
   run(
     () =>
-      Promise.all([getTryOnPool(), getTryOnReferenceSource(), getTryOnUsage()]),
-    ([p, s, u]) => {
+      Promise.all([
+        getTryOnPool(),
+        getTryOnReferenceSource(),
+        getTryOnUsage(),
+        getTryOnVendors()
+      ]),
+    ([p, s, u, v]) => {
       pool.value = p.data;
       source.value = s.data;
       usage.value = u.data;
+      vendors.value = v.data;
     }
   );
 onMounted(() => void load());
@@ -53,6 +62,67 @@ onMounted(() => void load());
     />
     <el-skeleton v-else-if="loading && !pool" :rows="5" animated />
     <template v-else-if="pool && source">
+      <el-card shadow="never">
+        <template #header>
+          <h2 class="text-base">供应商概况</h2>
+          <p class="mt-1 text-xs text-[var(--el-text-color-secondary)]">
+            标准和高质量分别用不同供应商，互不切换；这里看两边今天的会话、时长、花费和余额。
+          </p>
+        </template>
+        <el-table
+          :data="vendors"
+          empty-text="还没配置供应商账户，登记账户后可查看用量和余额。"
+        >
+          <el-table-column label="供应商" min-width="150"
+            ><template #default="{ row }">{{
+              row.vendor === "DECART" ? "高质量 · decart" : "标准 · XMax"
+            }}</template></el-table-column
+          >
+          <el-table-column label="健康 / 账户数" min-width="120"
+            ><template #default="{ row }"
+              >{{ row.healthyAccounts }} / {{ row.accounts }}</template
+            ></el-table-column
+          >
+          <el-table-column
+            prop="activeSessions"
+            label="在用连接"
+            min-width="100"
+          />
+          <el-table-column
+            prop="sessionsToday"
+            label="今日会话"
+            min-width="100"
+          />
+          <el-table-column
+            prop="secondsToday"
+            label="今日时长（秒）"
+            min-width="130"
+          />
+          <el-table-column
+            prop="consumedPointsToday"
+            label="今日花费（积分）"
+            min-width="140"
+          />
+          <el-table-column
+            prop="balancePoints"
+            label="余额（积分）"
+            min-width="120"
+          />
+          <el-table-column label="供应商连接 / 上限" min-width="160"
+            ><template #default="{ row }">{{
+              row.vendor === "DECART"
+                ? `${row.remoteConcurrencyActive ?? "—"} / ${row.remoteConcurrencyLimit ?? "—"}`
+                : "—"
+            }}</template></el-table-column
+          >
+        </el-table>
+        <p
+          v-if="vendors.length && vendors.every(item => !item.accounts)"
+          class="mt-3 text-xs text-[var(--el-text-color-secondary)]"
+        >
+          还没登记账户，对应档位无法提供试穿。
+        </p>
+      </el-card>
       <el-descriptions :column="1" border>
         <el-descriptions-item label="账户余额合计"
           >{{ pool.totalPoints }} 积分</el-descriptions-item
