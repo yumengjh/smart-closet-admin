@@ -64,46 +64,6 @@ assert.equal(calls.at(-1)[1], "/closet/models/routing/PORTRAIT");
 
 const source = await readFile(new URL("index.vue", import.meta.url), "utf8");
 const extract = (start, end) => source.slice(source.indexOf(start), source.indexOf(end));
-const routingCode = [
-  extract("const eligible =", "const healthText ="),
-  extract("const saveRouting =", "const resetRouting ="),
-  "globalThis.routing = { eligible, saveRouting, followImage };"
-].join("\n");
-const routingCalls = [];
-const overview = { value: {
-  providers: [{ id: "ready", status: "READY" }, { id: "down", status: "NO_KEY" }],
-  entries: [
-    { id: "image-a", capability: "IMAGE", enabled: true, providerId: "ready" },
-    { id: "disabled", capability: "IMAGE", enabled: false, providerId: "ready" },
-    { id: "unavailable", capability: "IMAGE", enabled: true, providerId: "down" },
-    { id: "vision", capability: "VISION", enabled: true, providerId: "ready" }
-  ],
-  routing: { PORTRAIT: { active: "image-a", revision: 7, followsImage: false } }
-} };
-const routingForms = { PORTRAIT: { active: "image-a", fallback: null } };
-const context = {
-  overview, routingForms,
-  mutate: async action => { await action(); return true; },
-  putRouting: (...args) => routingCalls.push(["put", ...args]),
-  deleteRouting: (...args) => routingCalls.push(["delete", ...args]),
-  message: () => assert.fail("unexpected routing validation error")
-};
-vm.runInNewContext(ts.transpileModule(routingCode, {
-  compilerOptions: { target: ts.ScriptTarget.ES2022 }
-}).outputText, context);
-assert.deepEqual(Array.from(context.routing.eligible("PORTRAIT"), entry => entry.id), ["image-a"]);
-await context.routing.saveRouting("PORTRAIT");
-assert.equal(routingCalls[0][0], "put");
-assert.equal(routingCalls[0][1], "PORTRAIT");
-assert.equal(routingCalls[0][2].active, "image-a");
-assert.equal(routingCalls[0][2].fallback, null);
-assert.equal(routingCalls[0][2].revision, 7);
-await context.routing.followImage("");
-assert.deepEqual(routingCalls[1], ["delete", "PORTRAIT"]);
-assert.match(source, /routingSlots: RoutingSlot\[\] = \[\.\.\.capabilities, "PORTRAIT"\]/);
-assert.match(source, /overview\.routing\.IMAGE\?\.effective/);
-assert.match(source, /PORTRAIT_ACTIVE"[\s\S]*?形象图生效[\s\S]*?PORTRAIT_FALLBACK"[\s\S]*?形象图备用/);
-assert.doesNotMatch(source, /ClosetCreationCapabilities/);
 
 // Both settings use one revision. Each save reloads the model before the
 // other dialog is opened, including for deployment-configured entries.

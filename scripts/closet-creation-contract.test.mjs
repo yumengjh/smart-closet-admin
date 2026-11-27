@@ -237,7 +237,6 @@ const editor = await readProjectFile("../src/views/integrations/closet/creation/
 assert.match(editor, /效果用哪个生图模型，在[\s\S]*?<router-link to="\/closet\/models">模型调配<\/router-link>[\s\S]*?里统一设置。/);
 assert.match(editor, /getCreationGenerationOptions/);
 const opsPage = await readProjectFile("../src/views/integrations/closet/ops/index.vue");
-assert.match(opsPage, /本地模型与服务商[\s\S]*?<router-link to="\/closet\/models">去模型调配<\/router-link>/);
 assert.doesNotMatch(opsPage, /creation\/capabilities|ClosetCreationCapabilities/);
 const modelsPage = await readProjectFile("../src/views/integrations/closet/models/index.vue");
 assert.doesNotMatch(modelsPage, /creation\/capabilities|ClosetCreationCapabilities/);

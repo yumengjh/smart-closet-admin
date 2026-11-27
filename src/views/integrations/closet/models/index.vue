@@ -62,19 +62,38 @@ const eventNames = {
   MANUAL_RESUME: "手动恢复"
 };
 const tab = ref<Capability>("VISION");
-const pageTab = ref(["config", "stability", "probe", "alerts", "usage"].includes(String(route.query.tab)) ? String(route.query.tab) : "config");
+const pageTab = ref(
+  ["config", "stability", "probe", "alerts", "usage"].includes(
+    String(route.query.tab)
+  )
+    ? String(route.query.tab)
+    : "config"
+);
 const busy = ref(false);
 const balanceSources = ref<Record<string, string>>({});
 const load = async () => {
-  await run(getModels, ({ data }) => { overview.value = data; });
+  await run(getModels, ({ data }) => {
+    overview.value = data;
+  });
   try {
-    const result = await http.request<ApiResponse<{ providers: { providerId: string; billing: { source: string } }[] }>>("get", "/closet/models/balances");
-    balanceSources.value = Object.fromEntries(result.data.providers.map(item => [item.providerId, item.billing.source]));
+    const result = await http.request<
+      ApiResponse<{
+        providers: { providerId: string; billing: { source: string } }[];
+      }>
+    >("get", "/closet/models/balances");
+    balanceSources.value = Object.fromEntries(
+      result.data.providers.map(item => [item.providerId, item.billing.source])
+    );
   } catch {
     balanceSources.value = {};
   }
 };
-const balanceSourceNames: Record<string, string> = { NONE: "未配置", NEWAPI: "NewAPI / OneAPI", OPENROUTER: "OpenRouter", MANUAL: "手动录入" };
+const balanceSourceNames: Record<string, string> = {
+  NONE: "未配置",
+  NEWAPI: "NewAPI / OneAPI",
+  OPENROUTER: "OpenRouter",
+  MANUAL: "手动录入"
+};
 const providerName = (id: string) =>
   overview.value?.providers.find(item => item.id === id)?.name ?? id;
 const entryName = (id?: string | null) => {
@@ -165,10 +184,7 @@ const removeEntry = async (row: ModelEntry) => {
 const tryEntry = async (row: ModelEntry) => {
   if (row.capability === "IMAGE") return;
   if (
-    !(await confirm(
-      "会产生一次真实调用费用，并计入全站模型预算。",
-      "试一次"
-    ))
+    !(await confirm("会产生一次真实调用费用，并计入全站模型预算。", "试一次"))
   )
     return;
   try {
@@ -437,7 +453,8 @@ const protocols = computed<ModelProtocol[]>(() => {
   const kind = overview.value?.providers.find(
     p => p.id === entryForm.providerId
   )?.kind;
-  if (kind === "AZURE_OPENAI") return entryForm.capability === "IMAGE" ? ["OPENAI_IMAGES"] : [];
+  if (kind === "AZURE_OPENAI")
+    return entryForm.capability === "IMAGE" ? ["OPENAI_IMAGES"] : [];
   if (kind === "GEMINI")
     return entryForm.capability === "CHAT" ? [] : ["GEMINI"];
   if (entryForm.capability === "VISION" || entryForm.capability === "CHAT")
@@ -500,7 +517,11 @@ const saveEntry = async () => {
     message("请填写服务商、协议和模型名", { type: "warning" });
     return;
   }
-  if (overview.value?.providers.find(p => p.id === entryForm.providerId)?.kind === "AZURE_OPENAI" && !entryForm.deployment.trim()) {
+  if (
+    overview.value?.providers.find(p => p.id === entryForm.providerId)?.kind ===
+      "AZURE_OPENAI" &&
+    !entryForm.deployment.trim()
+  ) {
     message("请填写 Azure deployment", { type: "warning" });
     return;
   }
@@ -530,7 +551,10 @@ const saveEntry = async () => {
   }
   if (entryForm.capability === "IMAGE") {
     options.supportsEdits = entryForm.supportsEdits;
-    if (overview.value?.providers.find(p => p.id === entryForm.providerId)?.kind === "AZURE_OPENAI") {
+    if (
+      overview.value?.providers.find(p => p.id === entryForm.providerId)
+        ?.kind === "AZURE_OPENAI"
+    ) {
       options.deployment = entryForm.deployment.trim();
       options.apiVersion = entryForm.apiVersion.trim() || "2025-04-01-preview";
     }
@@ -590,7 +614,15 @@ onMounted(() => {
       :closable="false"
     />
     <template v-if="overview && !unavailable">
-      <el-alert v-if="(overview.alerts?.firing ?? 0) > 0" :title="`有 ${overview.alerts?.firing} 条告警还没恢复`" type="error" show-icon :closable="false" class="mb-4" @click="pageTab = 'alerts'" />
+      <el-alert
+        v-if="(overview.alerts?.firing ?? 0) > 0"
+        :title="`有 ${overview.alerts?.firing} 条告警还没恢复`"
+        type="error"
+        show-icon
+        :closable="false"
+        class="mb-4"
+        @click="pageTab = 'alerts'"
+      />
       <el-tabs v-model="pageTab">
         <el-tab-pane label="配置" name="config" class="space-y-4">
           <el-alert
@@ -607,7 +639,11 @@ onMounted(() => {
             :closable="false"
             show-icon
           />
-          <ModelPoolConfig :overview="overview" :writable="writable" @refresh="load" />
+          <ModelPoolConfig
+            :overview="overview"
+            :writable="writable"
+            @refresh="load"
+          />
           <el-card>
             <template #header
               ><div class="card-heading">
@@ -660,7 +696,11 @@ onMounted(() => {
               >
               <el-table-column label="类型" width="120"
                 ><template #default="{ row }">{{
-                  row.kind === "GEMINI" ? "Gemini" : row.kind === "AZURE_OPENAI" ? "Azure OpenAI" : "OpenAI 兼容"
+                  row.kind === "GEMINI"
+                    ? "Gemini"
+                    : row.kind === "AZURE_OPENAI"
+                      ? "Azure OpenAI"
+                      : "OpenAI 兼容"
                 }}</template></el-table-column
               >
               <el-table-column
@@ -669,7 +709,11 @@ onMounted(() => {
                 min-width="190"
                 show-overflow-tooltip
               />
-              <el-table-column label="余额来源" min-width="130"><template #default="{ row }">{{ balanceSourceNames[balanceSources[row.id]] || '未获取' }}</template></el-table-column>
+              <el-table-column label="余额来源" min-width="130"
+                ><template #default="{ row }">{{
+                  balanceSourceNames[balanceSources[row.id]] || "未获取"
+                }}</template></el-table-column
+              >
               <el-table-column label="可信图片域名" min-width="160">
                 <template #default="{ row }">
                   <el-tag v-if="row.anyPublicImageHost" type="warning"
@@ -949,9 +993,15 @@ onMounted(() => {
             </el-table>
           </el-card>
         </el-tab-pane>
-        <el-tab-pane label="稳定性" name="stability" lazy><ModelStability /></el-tab-pane>
-        <el-tab-pane label="探活与余额" name="probe" lazy><ModelProbeBalance /></el-tab-pane>
-        <el-tab-pane label="告警" name="alerts" lazy><ModelAlerts /></el-tab-pane>
+        <el-tab-pane label="稳定性" name="stability" lazy
+          ><ModelStability
+        /></el-tab-pane>
+        <el-tab-pane label="探活与余额" name="probe" lazy
+          ><ModelProbeBalance
+        /></el-tab-pane>
+        <el-tab-pane label="告警" name="alerts" lazy
+          ><ModelAlerts
+        /></el-tab-pane>
         <el-tab-pane label="调用与消耗" name="usage" lazy>
           <ModelUsage :providers="overview.providers" />
         </el-tab-pane>
@@ -968,7 +1018,9 @@ onMounted(() => {
           ><el-select v-model="preset" @change="applyPreset"
             ><el-option label="不使用预设" value="" /><el-option
               label="阿里云百炼（北京）"
-              value="bj" /><el-option label="阿里云百炼（新加坡）" value="sg" /><el-option label="OpenRouter" value="openrouter"
+              value="bj" /><el-option
+              label="阿里云百炼（新加坡）"
+              value="sg" /><el-option label="OpenRouter" value="openrouter"
           /></el-select>
           <p class="help">北京和新加坡的密钥不通用。</p></el-form-item
         >
@@ -988,7 +1040,9 @@ onMounted(() => {
               label="OpenAI 兼容"
               value="OPENAI_COMPATIBLE" /><el-option
               label="Gemini"
-              value="GEMINI" /><el-option label="Azure OpenAI" value="AZURE_OPENAI" /></el-select
+              value="GEMINI" /><el-option
+              label="Azure OpenAI"
+              value="AZURE_OPENAI" /></el-select
         ></el-form-item>
         <el-form-item label="地址"
           ><el-input v-model="providerForm.baseUrl" /></el-form-item
@@ -1117,9 +1171,18 @@ onMounted(() => {
             https://dashscope.aliyuncs.com/api/v1
           </p></el-form-item
         >
-        <template v-if="overview?.providers.find(p => p.id === entryForm.providerId)?.kind === 'AZURE_OPENAI'">
-          <el-form-item label="Deployment"><el-input v-model="entryForm.deployment" /></el-form-item>
-          <el-form-item label="API Version"><el-input v-model="entryForm.apiVersion" /></el-form-item>
+        <template
+          v-if="
+            overview?.providers.find(p => p.id === entryForm.providerId)
+              ?.kind === 'AZURE_OPENAI'
+          "
+        >
+          <el-form-item label="Deployment"
+            ><el-input v-model="entryForm.deployment"
+          /></el-form-item>
+          <el-form-item label="API Version"
+            ><el-input v-model="entryForm.apiVersion"
+          /></el-form-item>
         </template>
         <template v-if="entryForm.protocol === 'OPENAI_CHAT'"
           ><template v-if="entryForm.capability === 'VISION'"
@@ -1163,7 +1226,12 @@ onMounted(() => {
           /></el-form-item>
         </template>
         <template v-if="entryForm.capability === 'IMAGE'"
-          ><el-form-item label="支持改图"><el-switch v-model="entryForm.supportsEdits" /><p class="help">关闭后这个模型只接没有参考图的任务；某些中转不支持改图接口。</p></el-form-item><el-form-item label="参考图上限"
+          ><el-form-item label="支持改图"
+            ><el-switch v-model="entryForm.supportsEdits" />
+            <p class="help">
+              关闭后这个模型只接没有参考图的任务；某些中转不支持改图接口。
+            </p></el-form-item
+          ><el-form-item label="参考图上限"
             ><el-input-number
               v-model="entryForm.maxReferenceImages"
               :min="1"

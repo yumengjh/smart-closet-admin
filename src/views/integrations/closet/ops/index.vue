@@ -29,8 +29,12 @@ import {
 defineOptions({ name: "ClosetOps" });
 const { can } = useCurrentPermissions();
 const poolNames: Record<string, string> = {
-  VISION: "识图", CHAT: "对话", IMAGE_PREMIUM: "生图 · 高质量",
-  IMAGE_STANDARD: "生图 · 标准", PORTRAIT_PREMIUM: "形象图 · 高质量", PORTRAIT_STANDARD: "形象图 · 标准"
+  VISION: "识图",
+  CHAT: "对话",
+  IMAGE_PREMIUM: "生图 · 高质量",
+  IMAGE_STANDARD: "生图 · 标准",
+  PORTRAIT_PREMIUM: "形象图 · 高质量",
+  PORTRAIT_STANDARD: "形象图 · 标准"
 };
 const { loading, unavailable, errorMessage, run } = useClosetRequest();
 const tab = ref("status");
@@ -415,19 +419,51 @@ onMounted(() => void load());
         <el-card shadow="never"
           ><template #header>
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <div><h2 class="text-base">本地模型与服务商</h2>
-                <p class="mt-1 text-xs text-[var(--el-text-color-secondary)]">查看模型池可用情况、降级状态和未恢复告警。</p></div>
-              <router-link v-if="can('closet:models:read')" to="/closet/models">去模型调配</router-link>
+              <div>
+                <h2 class="text-base">本地模型与服务商</h2>
+                <p class="mt-1 text-xs text-[var(--el-text-color-secondary)]">
+                  查看模型池可用情况、降级状态和未恢复告警。
+                </p>
+              </div>
+              <router-link v-if="can('closet:models:read')" to="/closet/models"
+                >去模型调配</router-link
+              >
             </div></template
           >
           <p class="mb-3 text-sm">
-            <router-link v-if="can('closet:models:read') && health.providers.alertsFiring != null" :to="{ path: '/closet/models', query: { tab: 'alerts' } }" class="text-[var(--el-color-danger)]">未恢复告警 {{ health.providers.alertsFiring }} 条</router-link>
-            <span v-else>未恢复告警 {{ health.providers.alertsFiring ?? '—' }} 条</span>
+            <router-link
+              v-if="
+                can('closet:models:read') &&
+                health.providers.alertsFiring != null
+              "
+              :to="{ path: '/closet/models', query: { tab: 'alerts' } }"
+              class="text-[var(--el-color-danger)]"
+              >未恢复告警 {{ health.providers.alertsFiring }} 条</router-link
+            >
+            <span v-else
+              >未恢复告警 {{ health.providers.alertsFiring ?? "—" }} 条</span
+            >
           </p>
-          <el-table :data="health.providers.pools ?? []" empty-text="还没配置模型池，适用的用途使用部署默认模型。" class="mb-4">
-            <el-table-column label="模型池"><template #default="{ row }">{{ poolNames[row.pool] ?? row.pool }}</template></el-table-column>
-            <el-table-column label="可用 / 总数"><template #default="{ row }">{{ row.available }} / {{ row.total }}</template></el-table-column>
-            <el-table-column label="正在降级"><template #default="{ row }">{{ row.degraded ? '是' : '否' }}</template></el-table-column>
+          <el-table
+            :data="health.providers.pools ?? []"
+            empty-text="还没配置模型池，适用的用途使用部署默认模型。"
+            class="mb-4"
+          >
+            <el-table-column label="模型池"
+              ><template #default="{ row }">{{
+                poolNames[row.pool] ?? row.pool
+              }}</template></el-table-column
+            >
+            <el-table-column label="可用 / 总数"
+              ><template #default="{ row }"
+                >{{ row.available }} / {{ row.total }}</template
+              ></el-table-column
+            >
+            <el-table-column label="正在降级"
+              ><template #default="{ row }">{{
+                row.degraded ? "是" : "否"
+              }}</template></el-table-column
+            >
           </el-table>
           <el-collapse
             ><el-collapse-item

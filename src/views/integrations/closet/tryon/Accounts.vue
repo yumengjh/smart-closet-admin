@@ -43,9 +43,7 @@ const budget = ref<number>();
 const query = ref("");
 const rows = computed(() =>
   accounts.value.filter(row =>
-    `${row.name}`
-      .toLowerCase()
-      .includes(query.value.toLowerCase())
+    `${row.name}`.toLowerCase().includes(query.value.toLowerCase())
   )
 );
 const load = () =>
@@ -85,7 +83,13 @@ const openCredential = (account?: TryOnAccount) => {
   credentialOpen.value = true;
 };
 const clearCredential = () => {
-  Object.assign(credential, { name: "", environment: "china", vendor: "XMAX", model: "", apiKey: "" });
+  Object.assign(credential, {
+    name: "",
+    environment: "china",
+    vendor: "XMAX",
+    model: "",
+    apiKey: ""
+  });
   credentialAccount.value = undefined;
 };
 const credentialValid = computed(
@@ -100,7 +104,13 @@ const credentialValid = computed(
 const saveCredential = async () => {
   if (!credentialValid.value) return;
   const account = credentialAccount.value;
-  const data = { ...credential, model: credential.vendor === "DECART" && credential.model ? credential.model : undefined };
+  const data = {
+    ...credential,
+    model:
+      credential.vendor === "DECART" && credential.model
+        ? credential.model
+        : undefined
+  };
   const result = await act(
     "credentials",
     account ? "轮换账户凭证" : "登记运营账户",
@@ -250,13 +260,21 @@ onMounted(() => void load());
     >
       <el-table-column prop="name" label="账户名称" min-width="150" />
       <el-table-column label="供应商" min-width="160">
-        <template #default="{ row }">{{ row.vendor === "DECART" ? "高质量 · decart" : "标准 · XMax" }}</template>
+        <template #default="{ row }">{{
+          row.vendor === "DECART" ? "高质量 · decart" : "标准 · XMax"
+        }}</template>
       </el-table-column>
       <el-table-column label="高质量模型" min-width="150">
-        <template #default="{ row }">{{ row.vendor === "DECART" ? (row.model || "默认模型") : "—" }}</template>
+        <template #default="{ row }">{{
+          row.vendor === "DECART" ? row.model || "默认模型" : "—"
+        }}</template>
       </el-table-column>
       <el-table-column label="供应商在用连接 / 上限" min-width="180">
-        <template #default="{ row }">{{ row.vendor === "DECART" ? `${row.remote_active ?? "—"} / ${row.remote_limit ?? "—"}` : "—" }}</template>
+        <template #default="{ row }">{{
+          row.vendor === "DECART"
+            ? `${row.remote_active ?? "—"} / ${row.remote_limit ?? "—"}`
+            : "—"
+        }}</template>
       </el-table-column>
       <el-table-column label="环境" min-width="90"
         ><template #default="{ row }">{{
@@ -477,14 +495,28 @@ onMounted(() => void load());
             maxlength="80"
             autocomplete="off" /></el-form-item
         ><el-form-item label="供应商" required>
-          <el-select v-model="credential.vendor" class="w-full" :disabled="!!credentialAccount" @change="credential.environment = credential.vendor === 'DECART' ? 'global' : 'china'">
+          <el-select
+            v-model="credential.vendor"
+            class="w-full"
+            :disabled="!!credentialAccount"
+            @change="
+              credential.environment =
+                credential.vendor === 'DECART' ? 'global' : 'china'
+            "
+          >
             <el-option label="标准 · XMax" value="XMAX" />
             <el-option label="高质量 · decart" value="DECART" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="credential.vendor === 'DECART'" label="模型（留空使用默认模型）">
-          <el-input v-model="credential.model" maxlength="80" placeholder="lucy-vton-latest" />
-        </el-form-item
+        <el-form-item
+          v-if="credential.vendor === 'DECART'"
+          label="模型（留空使用默认模型）"
+        >
+          <el-input
+            v-model="credential.model"
+            maxlength="80"
+            placeholder="lucy-vton-latest"
+          /> </el-form-item
         ><el-form-item label="供应商环境" required
           ><el-select
             v-model="credential.environment"
@@ -498,7 +530,11 @@ onMounted(() => void load());
             v-model="credential.apiKey"
             type="password"
             autocomplete="new-password"
-            :placeholder="credential.vendor === 'XMAX' ? 'uk- 开头的供应商密钥' : '供应商永久密钥'"
+            :placeholder="
+              credential.vendor === 'XMAX'
+                ? 'uk- 开头的供应商密钥'
+                : '供应商永久密钥'
+            "
             maxlength="503" /></el-form-item
       ></el-form>
       <template #footer

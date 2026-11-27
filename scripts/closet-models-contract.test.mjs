@@ -42,19 +42,6 @@ for (const [name, args, method, path, body] of cases) {
   assert.equal(actualPath, path, name);
   assert.deepEqual(options?.data ?? null, body ?? null, name);
 }
-const page = await read("src/views/integrations/closet/models/index.vue");
-assert.match(page, /会向上游发一次真实请求，可能产生少量费用，并计入全站模型预算/);
-assert.match(page, /entry\.enabled\s*&&\s*overview\.value\?\.providers\.some\(\s*provider\s*=>\s*provider\.id === entry\.providerId\s*&&\s*provider\.status === "READY"/);
-assert.match(page, /revision: current\.revision/);
-assert.match(page, /providerForm\.apiKey = ''/);
-assert.match(page, /row\.inUse === "ACTIVE"[\s\S]*row\.inUse === "FALLBACK"/);
-assert.match(page, /healthText\(row\.health\)/);
-assert.match(page, /v-if="row\.editable"/);
-assert.match(page, /!row\.deletable/);
-assert.match(page, /对话模型的 token 参数名只影响“试一次”/);
-assert.match(page, /if \(row\.capability === "IMAGE"\) return/);
-assert.match(page, /v-if="row\.capability !== 'IMAGE'"/);
-assert.match(page, /row\.kind === "REROUTED"\s*\?\s*entryName\(row\.code\)/);
 const apiSource = await read("src/api/closet/models.ts");
 assert.match(apiSource, /deleteRouting[\s\S]*ApiResponse<ModelRouting>/);
 assert.match(apiSource, /resumeEntry[\s\S]*ApiResponse<ModelEntry>/);

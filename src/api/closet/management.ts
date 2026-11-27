@@ -91,7 +91,12 @@ export type OpsStatus = {
     failed24h: number;
   };
   providers: Record<string, unknown> & {
-    pools?: Array<{ pool: string; available: number; total: number; degraded: boolean }>;
+    pools?: Array<{
+      pool: string;
+      available: number;
+      total: number;
+      degraded: boolean;
+    }>;
     alertsFiring?: number;
   };
   sessions: { active: number; onlineLast5Min: number };
