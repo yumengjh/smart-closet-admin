@@ -339,8 +339,16 @@ async function addSource(list: boolean) {
     message(`已加入 ${data.length} 件`, { type: "success" });
     await sourceRefresh();
   } catch (error) {
-    if (!(await expired(error, id)) && session.value?.sessionId === id)
-      showError(error);
+    if ((await expired(error, id)) || session.value?.sessionId !== id) return;
+    // 超时或服务暂不可用时，服务端可能已经加完：刷新列表看衣物上的状态，而不是让人再点一次。
+    const status = (error as { response?: { status?: number } }).response
+      ?.status;
+    if (!status || status === 503 || status === 504) {
+      message("加入可能仍在完成，已刷新列表，请看衣物上的状态", {
+        type: "warning"
+      });
+      await sourceRefresh();
+    } else showError(error);
   } finally {
     busy.value = false;
   }
@@ -468,6 +476,7 @@ onBeforeUnmount(() => {
                   :key="row.updatedAtMs"
                   :label="row.name || '预设衣物'"
                   :load="() => getPresetImage(row.id)"
+                  :src="row.imageUrl"
                 />
               </el-button>
               <div class="card-meta">
@@ -589,6 +598,7 @@ onBeforeUnmount(() => {
               <PresetImage
                 :label="row.name || '来源衣物'"
                 :load="() => readSourceImage(row.garmentId)"
+                :src="row.imageUrl"
               />
               <div class="card-meta">
                 <strong>{{ row.name || "未命名衣物" }}</strong>
@@ -626,7 +636,7 @@ onBeforeUnmount(() => {
               :disabled="!sourceSelection.length"
               :loading="busy"
               @click="addSource(true)"
-              >加入并上架</el-button
+              >{{ busy ? "加入中…" : "加入并上架" }}</el-button
             >
             <el-button text @click="tab = 'library'">查看预设库</el-button>
           </div>
@@ -666,6 +676,7 @@ onBeforeUnmount(() => {
           :key="selected.id"
           :label="selected.name || '预设衣物'"
           :load="() => getPresetImage(selected!.id)"
+          :src="selected!.imageUrl"
         />
         <el-form
           class="edit-form"

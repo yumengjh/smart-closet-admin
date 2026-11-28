@@ -59,10 +59,13 @@ const previewKey = computed(() =>
     ? `${props.templateId}|${detail.value.versionId}`
     : ""
 );
-const previewUrl = computed(() => previews.urls[previewKey.value] ?? "");
+// 有直连缩略图（存储桶 / CDN）就直接用；没有再经后台取图。
+const previewUrl = computed(
+  () => detail.value?.previewUrl || previews.urls[previewKey.value] || ""
+);
 function loadPreview(fresh: boolean) {
   const k = previewKey.value;
-  if (!k) return;
+  if (!k || detail.value?.previewUrl) return;
   if (fresh) previews.drop(k);
   previews.load(k);
 }
@@ -122,6 +125,10 @@ const noPreview = computed(
 );
 const readyTrial = computed(() =>
   trials.value.find(t => t.current && t.status === "SUCCEEDED")
+);
+// 有成功的试做但都不算数：模型、提示词或“需要人物”在那之后改过。
+const staleOnly = computed(
+  () => !readyTrial.value && trials.value.some(t => t.status === "SUCCEEDED")
 );
 const history = computed(() =>
   [...(summary.value?.versions ?? [])].sort((a, b) => b.version - a.version)
@@ -438,7 +445,9 @@ onMounted(async () => {
                   ? "先把一张满意的试做设为示意图"
                   : readyTrial
                     ? "用最新一张成功的试做上线。"
-                    : "先用当前内容试做成功一张"
+                    : staleOnly
+                      ? "模型、提示词或“需要人物”在试做之后改过，用当前内容再试做一张。改名称、说明不用重做。"
+                      : "先用当前内容试做成功一张。"
             }}
           </p>
           <el-button

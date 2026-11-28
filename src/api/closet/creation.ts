@@ -51,11 +51,15 @@ export type TemplateSummary = {
   versions: VersionSummary[];
   /** 起步示例；空白新建为 null。 */
   sampleKey: string | null;
+  /** 线上版本（否则最新草稿）示意图的直连缩略图；为空时走 preview-image。 */
+  previewUrl?: string | null;
 };
 export type VersionDetail = VersionSummary & {
   id: string;
   previewAssetId: string;
   previewImage: boolean;
+  /** 示意图直连缩略图（存储桶 / CDN）；为空时走 preview-image。 */
+  previewUrl?: string | null;
   options: { light: string[] };
   prompt: string;
   provider: string | null;
@@ -140,6 +144,8 @@ export type TrialGarment = {
   name: string;
   role: string;
   gender: string;
+  /** 直连缩略图；为空时走图片接口。 */
+  imageUrl?: string | null;
 };
 export type TrialPerson = {
   id: string;
@@ -147,6 +153,8 @@ export type TrialPerson = {
   width: number;
   height: number;
   createdAtMs: number;
+  /** 5 分钟有效的直连链接；为空时走图片接口。 */
+  imageUrl?: string | null;
 };
 export type TrialLight = "DEFAULT" | "WARM" | "COOL";
 export type TrialStart = {
@@ -171,9 +179,15 @@ export type Trial = {
   errorMessage: string | null;
   width: number | null;
   height: number | null;
+  /** 模型、提示词、是否需要人物与当前草稿一致，可用于上线。 */
   current: boolean;
+  /** 当前草稿的示意图来自这次试做。 */
+  preview?: boolean;
   createdAtMs: number;
   finishedAtMs: number | null;
+  /** 原图直连（放大看）与列表缩略图直连；为空时走图片接口。 */
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
 };
 export type UseTrial = { revision?: number; trialId: string };
 const trialImage = (path: string) =>
@@ -274,3 +288,16 @@ export const reorderCreationEffects = (ids: string[]) =>
     `${root}/templates/order`,
     { data: { ids } }
   );
+
+/** 用户端“做张图”是否能选创作效果：override 为空时跟随部署配置。 */
+export type CreationSettings = {
+  userEnabled: boolean;
+  override: boolean | null;
+  deploymentDefault: boolean;
+};
+export const getCreationSettings = () =>
+  http.request<ApiResponse<CreationSettings>>("get", `${root}/settings`);
+export const putCreationSettings = (userEnabled: boolean | null) =>
+  http.request<ApiResponse<CreationSettings>>("put", `${root}/settings`, {
+    data: { userEnabled }
+  });

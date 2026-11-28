@@ -90,18 +90,19 @@ const roleText: Record<string, string> = {
 };
 export const roleLabel = (role: string) => roleText[role] ?? "其他";
 
-// 后端的 message 直接给人看；冲突统一提示刷新（试做占用场景可保留后端原话）。
-export function errorText(e: unknown, keepServerOn409 = false) {
+// 后端的 message 直接给人看（冲突的原因也写在里面，比如“模型或提示词在试做之后改过”）；没有原话时才给通用提示。
+export function errorText(e: unknown, _keepServerOn409 = true) {
   const r = (
     e as { response?: { status?: number; data?: { message?: string } } }
   ).response;
   if (r?.status === 429) return "请求太频繁，请稍等几秒再试";
-  if (r?.status === 409 && !(keepServerOn409 && r.data?.message))
+  if (r?.status === 409 && !r.data?.message)
     return "内容已被别人改过，请刷新后再试";
   return r?.data?.message || "请求失败，请重试";
 }
 
-// 带鉴权取回的图片：全局最多 4 个并发，同一张图在页面生命周期内只取一次。
+// 带鉴权取回的图片：全局最多 4 个并发，同一张图在页面生命周期内只取一次；取失败的下次 load 会重取
+// （比如刚设好示意图，之前那次 404 不能一直算数）。
 const cache = new Map<string, string>();
 const queue: Array<() => Promise<void>> = [];
 let running = 0;
@@ -133,7 +134,7 @@ export function useBlobImages(
   let dead = false;
   const full = (id: string) => `${kind}:${id}`;
   function load(id: string) {
-    if (id in urls || pending.has(id)) return;
+    if (urls[id] || pending.has(id)) return;
     const hit = cache.get(full(id));
     if (hit) {
       urls[id] = hit;

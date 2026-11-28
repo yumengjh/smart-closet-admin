@@ -136,21 +136,102 @@ watch(
   },
   { immediate: true }
 );
+// 有直连地址（存储桶 / CDN）的图直接用，其余经后台取。
 watch(
   trials,
-  list => list.forEach(t => t.status === "SUCCEEDED" && trialImages.load(t.id)),
+  list =>
+    list.forEach(
+      t =>
+        t.status === "SUCCEEDED" &&
+        !t.thumbnailUrl &&
+        !t.imageUrl &&
+        trialImages.load(t.id)
+    ),
   { immediate: true }
 );
-watch(persons, list => list.forEach(p => personImages.load(p.id)), {
-  immediate: true
+watch(
+  persons,
+  list => list.forEach(p => !p.imageUrl && personImages.load(p.id)),
+  { immediate: true }
+);
+const garmentSrc = (g: TrialGarment) =>
+  g.imageUrl || garmentImages.urls[g.id] || "";
+const personSrc = (p: TrialPerson) =>
+  p.imageUrl || personImages.urls[p.id] || "";
+const trialThumb = (t: Trial) =>
+  t.thumbnailUrl || t.imageUrl || trialImages.urls[t.id] || "";
+const trialFull = (t: Trial) =>
+  t.imageUrl || t.thumbnailUrl || trialImages.urls[t.id] || "";
+
+// 计时：排队中 / 生成中每秒刷新已等时长；“一般约 N 秒”取最近成功试做的平均用时。
+const now = ref(Date.now());
+let ticker: ReturnType<typeof setInterval> | undefined;
+watch(
+  active,
+  on => {
+    if (on && !ticker)
+      ticker = setInterval(() => (now.value = Date.now()), 1000);
+    else if (!on && ticker) {
+      clearInterval(ticker);
+      ticker = undefined;
+    }
+  },
+  { immediate: true }
+);
+const typical = computed(() => {
+  const done = trials.value
+    .filter(t => t.status === "SUCCEEDED" && t.finishedAtMs)
+    .map(t => (t.finishedAtMs! - t.createdAtMs) / 1000)
+    .filter(s => s > 0 && s < 900);
+  return done.length
+    ? Math.round(done.reduce((a, b) => a + b, 0) / done.length)
+    : 60;
 });
+const clock = (seconds: number) => {
+  const s = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+const waited = (t: Trial) => (now.value - t.createdAtMs) / 1000;
+const percent = (t: Trial) =>
+  Math.min(95, Math.round((waited(t) / typical.value) * 100));
+const took = (t: Trial) =>
+  t.finishedAtMs ? clock((t.finishedAtMs - t.createdAtMs) / 1000) : "";
+
+// 完成时提示；页面在后台时把标签页标题改成提醒，回到页面再恢复。
+const watching = new Set<string>();
+const baseTitle = document.title;
+function restoreTitle() {
+  if (!document.hidden) document.title = baseTitle;
+}
+document.addEventListener("visibilitychange", restoreTitle);
+watch(trials, list => {
+  for (const t of list) {
+    const running = t.status === "QUEUED" || t.status === "RUNNING";
+    if (running) watching.add(t.id);
+    else if (watching.delete(t.id)) {
+      const ok = t.status === "SUCCEEDED";
+      message(
+        ok
+          ? `试做完成，用时 ${took(t)}`
+          : `试做没有成功：${t.errorMessage || "请稍后再试"}`,
+        { type: ok ? "success" : "error" }
+      );
+      if (document.hidden)
+        document.title = `${ok ? "【试做完成】" : "【试做失败】"}${baseTitle}`;
+    }
+  }
+});
+const records = ref<HTMLElement>();
 watch(needPerson, on => {
   if (on && !personId.value && persons.value.length)
     personId.value = persons.value[0].id;
 });
 onBeforeUnmount(() => {
   if (timer) clearInterval(timer);
+  if (ticker) clearInterval(ticker);
   observer?.disconnect();
+  document.removeEventListener("visibilitychange", restoreTitle);
+  document.title = baseTitle;
 });
 onMounted(async () => {
   void loadTrials();
@@ -178,8 +259,9 @@ async function start() {
       light: light.value,
       pose: needPerson.value && pose.value.trim() ? pose.value.trim() : null
     });
-    message("已开始试做", { type: "success" });
+    message("已开始试做，完成后会提示你，可以先看别的", { type: "success" });
     await loadTrials();
+    records.value?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   } catch (e) {
     message(errorText(e, true), { type: "error" });
   } finally {
@@ -252,6 +334,7 @@ async function setPreview(t: Trial) {
     });
     message("已设为示意图", { type: "success" });
     emit("changed");
+    void loadTrials();
   } catch (e) {
     message(errorText(e), { type: "error" });
   } finally {
@@ -288,7 +371,7 @@ const statusText = (t: Trial) =>
           <div
             v-for="g in shown"
             :key="g.id"
-            v-in-view="() => garmentImages.load(g.id)"
+            v-in-view="() => !g.imageUrl && garmentImages.load(g.id)"
             class="garment"
             :class="{
               on: picked.includes(g.id),
@@ -301,9 +384,10 @@ const statusText = (t: Trial) =>
             @keydown.enter.space.prevent="toggle(g)"
           >
             <img
-              v-if="garmentImages.urls[g.id]"
-              :src="garmentImages.urls[g.id]"
+              v-if="garmentSrc(g)"
+              :src="garmentSrc(g)"
               :alt="g.name"
+              loading="lazy"
             />
             <div v-else class="ph" />
             <span class="gname">{{ g.name }}</span>
@@ -333,11 +417,7 @@ const statusText = (t: Trial) =>
             @click="personId = p.id"
             @keydown.enter.space.prevent="personId = p.id"
           >
-            <img
-              v-if="personImages.urls[p.id]"
-              :src="personImages.urls[p.id]"
-              :alt="p.note"
-            />
+            <img v-if="personSrc(p)" :src="personSrc(p)" :alt="p.note" />
             <div v-else class="ph" />
             <el-button
               class="del"
@@ -389,30 +469,45 @@ const statusText = (t: Trial) =>
             >
           </span>
         </el-tooltip>
-        <span class="hint">会真实调用一次模型，约一分钟，产生平台费用。</span>
+        <span class="hint"
+          >会真实调用一次模型，一般约 {{ typical }} 秒，产生平台费用。</span
+        >
       </div>
       <div v-if="reason" class="hint">{{ reason }}</div>
     </template>
 
-    <h3>试做记录</h3>
+    <h3 ref="records">试做记录</h3>
     <div v-if="!trials.length" class="hint">还没有试做过。</div>
     <div class="records">
       <article v-for="t in trials" :key="t.id" class="record">
-        <div
-          v-loading="t.status === 'QUEUED' || t.status === 'RUNNING'"
-          class="shot"
-        >
+        <div class="shot">
           <el-image
-            v-if="t.status === 'SUCCEEDED' && trialImages.urls[t.id]"
-            :src="trialImages.urls[t.id]"
-            :preview-src-list="[trialImages.urls[t.id]]"
+            v-if="t.status === 'SUCCEEDED' && trialThumb(t)"
+            :src="trialThumb(t)"
+            :preview-src-list="[trialFull(t)]"
             preview-teleported
             fit="cover"
             class="img"
           />
-          <span v-else-if="t.status === 'QUEUED' || t.status === 'RUNNING'">{{
-            statusText(t)
-          }}</span>
+          <div
+            v-else-if="t.status === 'QUEUED' || t.status === 'RUNNING'"
+            class="wait"
+          >
+            <strong>{{ statusText(t) }}</strong>
+            <span class="clock">已等 {{ clock(waited(t)) }}</span>
+            <el-progress
+              :percentage="percent(t)"
+              :show-text="false"
+              :indeterminate="waited(t) > typical"
+              :stroke-width="6"
+              class="bar-progress"
+            />
+            <span class="hint">{{
+              waited(t) > typical
+                ? "比平时慢一些，还在等模型返回"
+                : `一般约 ${typical} 秒`
+            }}</span>
+          </div>
           <span v-else-if="t.status === 'FAILED'" class="err">{{
             t.errorMessage || "失败"
           }}</span>
@@ -429,16 +524,29 @@ const statusText = (t: Trial) =>
               size="small"
               :type="t.current ? 'success' : 'info'"
               effect="plain"
+              :title="
+                t.current
+                  ? '模型、提示词与现在的草稿一致，可以用来上线'
+                  : '模型、提示词或“需要人物”在这之后改过'
+              "
               >{{ t.current ? "当前内容" : "内容已改过" }}</el-tag
+            >
+            <el-tag v-if="t.preview" size="small" type="warning" effect="plain"
+              >示意图</el-tag
             >
           </div>
           <div class="hint">{{ t.provider }} / {{ t.model }}</div>
           <div class="hint">
             {{ t.garmentCount }} 件衣物 · {{ formatTime(t.createdAtMs) }}
+            <template
+              v-if="t.status !== 'QUEUED' && t.status !== 'RUNNING' && took(t)"
+            >
+              · 用时 {{ took(t) }}</template
+            >
           </div>
           <div v-if="t.status === 'SUCCEEDED'" class="ops">
             <el-button
-              v-if="canSetPreview"
+              v-if="canSetPreview && !t.preview"
               size="small"
               :disabled="busy"
               @click="setPreview(t)"
@@ -601,6 +709,21 @@ h3 {
 }
 .err {
   color: var(--el-color-danger);
+}
+.wait {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+}
+.clock {
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  color: var(--el-text-color-primary);
+}
+.bar-progress {
+  width: 80%;
 }
 .meta {
   display: flex;

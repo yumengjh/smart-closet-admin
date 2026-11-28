@@ -28,6 +28,8 @@ export type ManagedPreset = Omit<PresetEdit, "name"> & {
   importedCount: number;
   createdAtMs: number;
   updatedAtMs: number;
+  /** 存储桶 / CDN 直连缩略图；为空时走图片接口。 */
+  imageUrl?: string | null;
 };
 export type PresetSource = Pick<
   ManagedPreset,
@@ -36,6 +38,7 @@ export type PresetSource = Pick<
   garmentId: string;
   inLibrary: PresetStatus | "REMOVED" | null;
   presetId: string | null;
+  imageUrl?: string | null;
 };
 export type PresetSession = {
   sessionId: string;
@@ -106,7 +109,8 @@ export const importPresetSources = (
   http.request<ApiResponse<ManagedPreset[]>>(
     "post",
     `${source(sessionId)}/import`,
-    { data: { garmentIds, list } }
+    // 一次加入很多件时要复制图片，给足两分钟。
+    { data: { garmentIds, list }, timeout: 120000 }
   );
 
 export type StyleCover = {
