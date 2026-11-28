@@ -6,12 +6,15 @@ import {
   deleteCreationEffect,
   getCreationPreviewImage,
   getCreationPromptSamples,
+  getCreationSettings,
   getCreationTemplates,
+  putCreationSettings,
   getCreationTrials,
   getCreationVersion,
   launchCreationVersion,
   reorderCreationEffects,
   retireCreationTemplate,
+  type CreationSettings,
   type PromptSample,
   type TemplateSummary
 } from "@/api/closet/creation";
@@ -49,9 +52,10 @@ async function refresh() {
   loading.value = true;
   try {
     templates.value = (await getCreationTemplates()).data.items;
+    // 有直连缩略图（存储桶 / CDN）就直接用，不再经后台取图。
     templates.value.forEach(t => {
       const k = key(t);
-      if (k) previews.load(k);
+      if (k && !t.previewUrl) previews.load(k);
     });
   } catch (e) {
     message(errorText(e), { type: "error" });
@@ -357,7 +361,40 @@ const summary = computed(() => {
   );
 });
 
-onMounted(refresh);
+// 用户端是否开放创作效果：运行时开关，一拨即生效；为空时跟随部署配置。
+const settings = ref<CreationSettings>();
+const settingBusy = ref(false);
+async function loadSettings() {
+  try {
+    settings.value = (await getCreationSettings()).data;
+  } catch {
+    settings.value = undefined; // 管理接口较旧时不显示这一行
+  }
+}
+async function saveSetting(value: boolean | null) {
+  if (!canPublish.value || settingBusy.value) return;
+  settingBusy.value = true;
+  try {
+    settings.value = (await putCreationSettings(value)).data;
+    message(
+      settings.value.userEnabled
+        ? "已开放，用户刷新做张图页面即可看到已上线的效果"
+        : "已关闭，用户在做张图里只能做上身图",
+      { type: "success" }
+    );
+  } catch (e) {
+    message(errorText(e), { type: "error" });
+  } finally {
+    settingBusy.value = false;
+  }
+}
+const previewSrc = (t: TemplateSummary) =>
+  t.previewUrl || previews.urls[key(t)] || "";
+
+onMounted(() => {
+  void refresh();
+  void loadSettings();
+});
 onBeforeUnmount(clearImageCache);
 </script>
 
@@ -398,6 +435,38 @@ onBeforeUnmount(clearImageCache);
           <el-button v-if="canWrite" type="primary" @click="openCreate"
             >新建效果</el-button
           >
+        </div>
+      </div>
+
+      <div v-if="settings" class="user-switch">
+        <el-switch
+          :model-value="settings.userEnabled"
+          :loading="settingBusy"
+          :disabled="!canPublish"
+          aria-label="用户端开放创作效果"
+          @change="v => saveSetting(!!v)"
+        />
+        <div>
+          <strong>用户端开放创作效果</strong>
+          <p class="caption small">
+            {{
+              settings.userEnabled
+                ? "已开放：用户在「试穿 → 做张图」里可以选已上线的效果。"
+                : counts.live
+                  ? `已关闭：${counts.live} 个已上线的效果用户暂时看不到，做张图里只能做上身图。`
+                  : "已关闭：用户在「试穿 → 做张图」里只能做上身图。"
+            }}
+            <template v-if="settings.override !== null">
+              部署配置默认{{ settings.deploymentDefault ? "开" : "关" }}，
+              <el-button
+                link
+                type="primary"
+                :disabled="!canPublish || settingBusy"
+                @click="saveSetting(null)"
+                >恢复默认</el-button
+              >
+            </template>
+          </p>
         </div>
       </div>
 
@@ -473,11 +542,7 @@ onBeforeUnmount(clearImageCache);
           @click="selecting && toggleSelect(t.id)"
         >
           <div class="thumb">
-            <img
-              v-if="previews.urls[key(t)]"
-              :src="previews.urls[key(t)]"
-              alt=""
-            />
+            <img v-if="previewSrc(t)" :src="previewSrc(t)" alt="" />
             <span v-else>暂无示意图</span>
             <el-checkbox
               v-if="selecting"
@@ -620,6 +685,19 @@ h1 {
 }
 .search {
   width: 180px;
+}
+.user-switch {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--el-fill-color-light);
+  border-radius: 6px;
+}
+.user-switch .caption.small {
+  margin: 4px 0 0;
+  font-size: 13px;
 }
 .bar {
   display: flex;
